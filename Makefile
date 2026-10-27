@@ -35,6 +35,10 @@ lint: ## Lint the project using flake8
 	@$(PYTHON) -m flake8 app tests main.py
 	@echo "Linting completed."
 
+hooks: ## Enable the pre-commit secret scan for this clone
+	@git config core.hooksPath .githooks
+	@echo "Pre-commit secret scan enabled."
+
 test: ## Run all tests
 	@$(PYTHON) -m unittest discover -s tests
 	@echo "Tests completed."
@@ -51,4 +55,4 @@ docker:
 	@docker build -t mask-punisher .
 	@#docker run -p 3000:3000 mask_utils-punisher
 # Phony targets (not related to files)
-.PHONY: help venv install run lint test clean reset docker
+.PHONY: help venv install run lint test hooks clean reset docker

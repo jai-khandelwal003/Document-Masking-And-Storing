@@ -151,6 +151,7 @@ def login():
 
         if hmac.compare_digest(user_id, configured_user) and _password_matches(password):
             session["auth_user"] = user_id
+            session.permanent = True
             session["show_welcome_toast"] = True
 
             next_url = _safe_next(request.args.get("next"))
@@ -224,6 +225,7 @@ def clerk_session():
 
     session.clear()
     session["auth_user"] = identity
+    session.permanent = True
     session["show_welcome_toast"] = True
     redirect_to = _safe_next(payload.get("next")) or url_for("auth.dashboard")
     return jsonify({"redirect": redirect_to}), 200

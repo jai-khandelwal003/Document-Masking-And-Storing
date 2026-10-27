@@ -451,7 +451,7 @@ class StorageConfigTests(unittest.TestCase):
     def _prod_app(self, **config):
         app = Flask(__name__)
         app.config.update(
-            PRODUCTION=True, SECRET_KEY="s", HASH_SECRET="h", AUTH_PROVIDER="local", USER_PASSWORD="a-long-unique-passphrase",
+            PRODUCTION=True, SESSION_COOKIE_SECURE=True, SECRET_KEY="s", HASH_SECRET="h", AUTH_PROVIDER="local", USER_PASSWORD="a-long-unique-passphrase",
             API_KEY_REQUIRED=False, HEALTH_DETAILS_TOKEN="t", ACCESS_SHOW_CODE=False, IDENTITY_SHOW_OTP=False,
             IDENTITY_OTP_PROVIDER="email", OTP_EMAIL_SMTP_HOST="smtp.example.net", OTP_EMAIL_USERNAME="m@example.net",
             OTP_EMAIL_PASSWORD="real-secret", OTP_EMAIL_FROM="m@example.net",

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>(function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();</script>
+  <script nonce="{{ csp_nonce }}">(function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();</script>
   <title>{{ 'Signing out' if logout else 'Sign in' }} | {{ branding.projectTitle }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,7 +40,7 @@
     data-clerk-publishable-key="{{ publishable_key }}"
     src="https://{{ frontend_host }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
     id="clerk-script"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     (function () {
       var LOGOUT = {{ 'true' if logout else 'false' }};
       var NEXT_URL = {{ next_url | tojson }};

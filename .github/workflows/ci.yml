@@ -12,6 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Scan for committed secrets
+        run: python tools/scan_secrets.py --all
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

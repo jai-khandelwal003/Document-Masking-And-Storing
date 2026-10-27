@@ -1,0 +1,9 @@
+#!/bin/sh
+# Blocks commits that contain secrets or private data files.
+# Enable once per clone:  git config core.hooksPath .githooks   (or: make hooks)
+PY=$(command -v python3 || command -v python || command -v py)
+if [ -z "$PY" ]; then
+  echo "pre-commit: python not found, skipping secret scan" >&2
+  exit 0
+fi
+exec "$PY" tools/scan_secrets.py --staged

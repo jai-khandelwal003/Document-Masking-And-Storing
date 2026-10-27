@@ -14,6 +14,7 @@ All behavior is controlled by environment variables, read once in `app/config.py
 | Core | `APP_ENV`, `PRODUCTION`, `PORT`, `HOST`, `DEBUG`, `SECRET_KEY`, `HASH_SECRET`, `HASH_ALGORITHM` |
 | Login | `AUTH_PROVIDER` (`local`/`clerk`), `USER_ID`, `USER_PASSWORD`, `SHOW_LOGIN_CREDENTIAL_HINTS` |
 | Clerk | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_JWKS_URL`, `CLERK_AUTHORIZED_PARTIES`, `CLERK_ALLOWED_EMAILS`, `CLERK_ALLOWED_DOMAINS`, `CLERK_ALLOW_ANY_USER` |
+| Browser security | `SESSION_COOKIE_SECURE`, `SESSION_COOKIE_SAMESITE`, `SESSION_LIFETIME_HOURS`, `SECURITY_HEADERS_ENABLED`, `SECURITY_CSP` (`off` or custom), `SECURITY_CSP_REPORT_ONLY` |
 | Proxy / detection | `TRUST_PROXY_HEADERS`, `AADHAAR_ALLOW_UNCHECKED` |
 | API | `API_KEY_REQUIRED`, `API_KEY`, `APP_API_KEY`, `RATE_LIMIT_*`, `HEALTH_DETAILS_TOKEN`, `RETURN_RAW_AADHAAR` |
 | Access code | `ACCESS_CODE_TTL_SECONDS`, `ACCESS_TOKEN_TTL_SECONDS`, `ACCESS_MAX_ATTEMPTS`, `ACCESS_SHOW_CODE`, `ACCESS_FALLBACK_SECRET` |
@@ -32,6 +33,7 @@ The app raises `RuntimeError` at startup in production if:
 - `HEALTH_DETAILS_TOKEN` is empty
 - `ACCESS_SHOW_CODE` or `IDENTITY_SHOW_OTP` is true, or OTP provider is `demo`
 - OTP provider is `email` with missing SMTP values or placeholder values
+- `SESSION_COOKIE_SECURE=false` (production must use HTTPS cookies)
 - `STORAGE_BACKEND=s3` without credentials (or an AWS credential source)
 - `AUTH_PROVIDER=local` with a default or short (under 10 chars) `USER_PASSWORD`
 - `AUTH_PROVIDER=clerk` without both keys, or without an allow-list (unless `CLERK_ALLOW_ANY_USER=true`)

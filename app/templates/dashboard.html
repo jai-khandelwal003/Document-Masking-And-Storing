@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); })();</script>
+  <script nonce="{{ csp_nonce }}">(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); })();</script>
   <meta name="msapplication-TileColor" content="#0d1b2a">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.svg">
   <title>Smart Document Masking</title>
@@ -4059,7 +4059,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     const BRANDING = {{ branding | tojson }};
     const APP_API_KEY = String(BRANDING.appApiKey || "").trim();
     const LOGGED_IN_USER = {{ (username or 'User') | tojson }};

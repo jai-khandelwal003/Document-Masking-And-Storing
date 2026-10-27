@@ -297,6 +297,7 @@ class ProductionGuardrailTests(unittest.TestCase):
         app = Flask(__name__)
         app.config.update(
             PRODUCTION=True,
+            SESSION_COOKIE_SECURE=True,
             SECRET_KEY="s",
             HASH_SECRET="h",
             API_KEY_REQUIRED=False,

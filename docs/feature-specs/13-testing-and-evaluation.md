@@ -14,6 +14,8 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_identity_vault_fullmask.py` | vault behavior when everything is masked |
 | `test_auth_clerk.py` | Clerk login page and session exchange, JWT verification (signature/expiry/issuer/azp), allow-list, local password persistence, output ownership, proxy trust, production guardrails |
 | `test_storage.py` | S3 backend (fake client): upload/serve/delete, 502 on outage, no leftover local files, retention cleanup, health, config guardrails |
+| `test_security_headers.py` | security headers, per-request CSP nonce on every inline script, cache rules, cookie flags, service-worker rules |
+| `test_scan_secrets.py` | secret scanner: token patterns, placeholders, blocked files |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); })();</script>
+  <script nonce="{{ csp_nonce }}">(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); })();</script>
   <title>Login | Smart Document Masking</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -296,7 +296,7 @@
     </form>
   </section>
 
-  <script>
+  <script nonce="{{ csp_nonce }}">
     const passwordInput = document.getElementById("password");
     const togglePassword = document.getElementById("toggle-password");
     const loginForm = document.getElementById("login-form");

@@ -9,6 +9,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency for local/
     Swagger = None
 
 from app.config import Config
+from app.security import init_security
 from app.routes import access, auth, health, mask
 from app.models.identity_store import init_db as init_identity_db
 from app.models.audit_store import init_db as init_audit_db
@@ -37,6 +38,9 @@ def _apply_runtime_guardrails(app):
         raise RuntimeError("Production requires SECRET_KEY environment variable")
     if not os.environ.get("HASH_SECRET", "").strip():
         raise RuntimeError("Production requires HASH_SECRET environment variable")
+
+    if not _is_truthy(app.config.get("SESSION_COOKIE_SECURE", False)):
+        raise RuntimeError("Production requires SESSION_COOKIE_SECURE=true (serve the app over HTTPS)")
 
     auth_provider = str(app.config.get("AUTH_PROVIDER", "local")).strip().lower()
     if auth_provider == "clerk":
@@ -118,6 +122,7 @@ def create_app():
         },
     )
     _apply_runtime_guardrails(app)
+    init_security(app)
     if Swagger is not None:
         Swagger(app)
     init_storage(app)

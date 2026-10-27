@@ -48,6 +48,21 @@ S3_SECRET_ACCESS_KEY=...
   unreachable, uploads fail with HTTP 502 and nothing is left half-saved.
 - Keeping Aadhaar-related documents with a third-party cloud provider has legal consequences. Check your obligations first.
 
+## Security hardening
+
+- **Session cookie:** `HttpOnly`, `SameSite=Lax`, `Secure` in production (`SESSION_COOKIE_SECURE`), expires after
+  `SESSION_LIFETIME_HOURS` (default 8). Production refuses to start without secure cookies, so serve it over HTTPS.
+- **Security headers** on every response: `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Permissions-Policy`, and a **Content-Security-Policy** that uses a fresh nonce per request for inline scripts (no
+  `unsafe-inline` for scripts). Pages with documents or login data are sent with `Cache-Control: no-store`.
+  If a page ever looks broken, open the browser console: CSP errors name the blocked source. Temporary switches:
+  `SECURITY_CSP_REPORT_ONLY=true` (log instead of block), `SECURITY_CSP=off`, or `SECURITY_HEADERS_ENABLED=false`.
+- **Service worker** (`app/static/sw.js`) only caches public static assets. An older version cached pages and masked
+  images in the browser; version 2 deletes those old caches automatically when the page is next opened.
+- **Secret scanner:** `tools/scan_secrets.py` blocks commits (and CI) that contain API keys, private keys, password-like
+  literals, `.env` files, certificates, databases or anything under `output/`. Enable it once per clone with
+  `make hooks` (or `git config core.hooksPath .githooks`). Add `secret-scan: ignore` to a line for a deliberate false positive.
+
 ## Known limitations
 
 - **Single worker by design.** Access codes, OTPs and the identity vault are kept in process memory (snapshotted to SQLite),

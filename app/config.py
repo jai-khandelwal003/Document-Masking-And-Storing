@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 
 def _env_bool(name, default=False):
@@ -49,6 +50,15 @@ class Config:
     USER_ID = _env_text('USER_ID', 'admin')
     USER_PASSWORD = _env_text('USER_PASSWORD', 'admin123')
     SHOW_LOGIN_CREDENTIAL_HINTS = _env_bool('SHOW_LOGIN_CREDENTIAL_HINTS', False)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = _env_text('SESSION_COOKIE_SAMESITE', 'Lax')
+    # Secure cookies need HTTPS, so they default on only in production.
+    SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', _is_production_env())
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=max(1, int(os.environ.get('SESSION_LIFETIME_HOURS', 8))))
+    SECURITY_HEADERS_ENABLED = _env_bool('SECURITY_HEADERS_ENABLED', True)
+    # Empty = built-in policy, 'off' = disabled, anything else = custom policy string.
+    SECURITY_CSP = _env_text('SECURITY_CSP')
+    SECURITY_CSP_REPORT_ONLY = _env_bool('SECURITY_CSP_REPORT_ONLY', False)
     AUTH_PROVIDER = _default_auth_provider()
     CLERK_PUBLISHABLE_KEY = _env_text('CLERK_PUBLISHABLE_KEY')
     CLERK_SECRET_KEY = _env_text('CLERK_SECRET_KEY')
