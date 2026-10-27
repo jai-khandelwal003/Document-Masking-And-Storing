@@ -16,6 +16,8 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_storage.py` | S3 backend (fake client): upload/serve/delete, 502 on outage, no leftover local files, retention cleanup, health, config guardrails |
 | `test_security_headers.py` | security headers, per-request CSP nonce on every inline script, cache rules, cookie flags, service-worker rules |
 | `test_scan_secrets.py` | secret scanner: token patterns, placeholders, blocked files |
+| `test_pdf_pages.py` | multi-page PDFs: every page masked, image-only output PDF (no text layer), limits, encryption, secure/owner access, remote storage |
+| `test_aadhaar_masker.py` | masker with mocked OCR: numbers found by different passes, dedupe, overlap |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.
@@ -25,7 +27,7 @@ Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted ac
 ## Accuracy evaluation (`tools/evaluate_metrics.py`)
 - Input: a CSV like `evaluation/labels_template.csv` with columns `filename,document_type,expected_detected`.
 - It posts each sample to a running service with `requests` and compares the `aadhaarDetected` / `panDetected` / `drivingLicenceDetected` flag per type to the label, then reports metrics per document type.
-- `python tools/generate_synthetic_samples.py` creates 42 synthetic images (no real data) and `evaluation/labels_synthetic.csv`; run the evaluation with `--in-process` (no server or login needed), or against a running service with `--cookie` / `--api-key`.
+- `python tools/generate_synthetic_samples.py` creates 42 synthetic images (no real data) and `evaluation/labels_synthetic.csv`; run the evaluation with `--in-process` (no server or login needed; it runs in a temp folder and never touches `output/`), or against a running service with `--cookie` / `--api-key`.
 - Measured results and their caveats are in `evaluation/RESULTS.md`. Real identity documents must never be added.
 
 ## CI

@@ -266,7 +266,7 @@ class MaskedOutputStorageTests(RemoteStorageAppTestBase):
         self.assertEqual(os.listdir(self.out_dir), [name])
 
     def test_failed_pdf_conversion_deletes_the_uploaded_original(self):
-        with patch.object(mask_service, "_convert_pdf_first_page_to_jpg", side_effect=RuntimeError("bad pdf")):
+        with patch.object(mask_service, "_convert_pdf_pages_to_jpgs", side_effect=RuntimeError("bad pdf")):
             response = self.client.post(
                 "/mask/document",
                 data={"file": (io.BytesIO(PDF_BYTES), "scan.pdf")},

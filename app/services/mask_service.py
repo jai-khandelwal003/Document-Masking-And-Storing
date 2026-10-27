@@ -19,49 +19,134 @@ OUTPUT_DIR = "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def _convert_pdf_first_page_to_jpg(input_pdf_path: str) -> str:
-    errors = []
+class PdfPageLimitError(Exception):
+    def __init__(self, page_count, max_pages):
+        super().__init__(f"This PDF has {page_count} pages; the maximum is {max_pages}. Split it and upload the parts.")
+        self.page_count = page_count
+        self.max_pages = max_pages
+
+
+def _max_pdf_pages() -> int:
+    configured = current_app.config.get("MAX_PDF_PAGES") if has_app_context() else None
+    return max(1, int(configured or getattr(Config, "MAX_PDF_PAGES", 20)))
+
+
+def _convert_pdf_pages_to_jpgs(input_pdf_path: str, max_pages: int) -> list:
+    """Render every page of a PDF to a temporary JPG and return the paths in page order.
+
+    Raises PdfPageLimitError for PDFs longer than max_pages (nothing is processed partially),
+    and ValueError/RuntimeError for unreadable or password-protected files. Temp files are
+    removed if anything fails.
+    """
+    import fitz  # PyMuPDF: renders without external poppler/gs tools
+
     render_dpi = max(120, min(300, int(getattr(Config, "PDF_RENDER_DPI", 180))))
-
-    # Primary path: PyMuPDF works well on Windows without external poppler/gs tools.
+    paths = []
     try:
-        import fitz  # type: ignore
-
         with fitz.open(input_pdf_path) as doc:
+            if doc.needs_pass:
+                raise ValueError("PDF is password-protected")
             if doc.page_count < 1:
                 raise ValueError("PDF has no pages")
-            page = doc.load_page(0)
-            pix = page.get_pixmap(alpha=False, dpi=render_dpi)
+            if doc.page_count > max_pages:
+                raise PdfPageLimitError(doc.page_count, max_pages)
+            for index in range(doc.page_count):
+                pix = doc.load_page(index).get_pixmap(alpha=False, dpi=render_dpi)
+                handle = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                handle.close()
+                paths.append(handle.name)
+                pix.save(handle.name)
+        return paths
+    except Exception:
+        for path in paths:
+            if os.path.exists(path):
+                os.remove(path)
+        raise
 
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-        output_path = temp_file.name
-        temp_file.close()
-        pix.save(output_path)
-        return output_path
-    except Exception as exc:
-        errors.append(exc)
 
-    # Fallback path: PIL may work when PDF plugins are present.
+def _build_pdf_from_images(image_paths: list, pdf_path: str) -> None:
+    """Assemble masked page images into one PDF. Image-only on purpose: the original text layer
+    (where a number could hide as selectable text) is not carried over."""
+    import fitz
+
+    dpi = max(120, min(300, int(getattr(Config, "PDF_RENDER_DPI", 180))))
+    doc = fitz.open()
     try:
-        with Image.open(input_pdf_path) as pdf_image:
-            first_page = pdf_image.convert("RGB")
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-            output_path = temp_file.name
-            temp_file.close()
-            first_page.save(output_path, format="JPEG", quality=95)
-            return output_path
-    except Exception as exc:
-        errors.append(exc)
+        for image_path in image_paths:
+            pix = fitz.Pixmap(image_path)
+            page = doc.new_page(width=pix.width * 72 / dpi, height=pix.height * 72 / dpi)
+            page.insert_image(page.rect, filename=image_path)
+        doc.set_metadata({})
+        doc.save(pdf_path, garbage=4, deflate=True)
+    finally:
+        doc.close()
 
-    raise RuntimeError("; ".join(str(err) for err in errors if str(err)) or "PDF conversion failed")
+
+def _mask_page(page_input, page_output, normalized_type, mask_first8, mask_last4, mask_qr):
+    """Run the whole masking pipeline on one page image; an image is always left at page_output."""
+    from app.services.mask_utils.aadhaar import mask_aadhaar
+
+    result = {
+        "aadhaar_detected": False, "aadhaar_number": "", "aadhaar_count": 0,
+        "pan_detected": False, "dl_detected": False, "pan_count": 0, "dl_count": 0,
+        "pan_value": "", "dl_value": "", "pan_conf": 0.0, "dl_conf": 0.0, "pan_pattern": "", "dl_pattern": "",
+        "qr_detected": False, "qr_count": 0, "qr_engine": "none", "qr_warning": "",
+    }
+
+    if normalized_type in {"aadhaar", "all"}:
+        result["aadhaar_detected"], result["aadhaar_number"], result["aadhaar_count"] = mask_aadhaar(
+            page_input, page_output, mask_first8, mask_last4
+        )
+
+    if normalized_type in {"pan", "dl", "all"}:
+        from app.services.mask_utils.document_generic import mask_pan_and_driving_licence
+
+        if not os.path.exists(page_output):
+            shutil.copy(page_input, page_output)
+
+        (result["pan_detected"], result["dl_detected"], result["pan_count"], result["dl_count"],
+         result["pan_value"], result["dl_value"], result["pan_conf"], result["dl_conf"],
+         result["pan_pattern"], result["dl_pattern"]) = mask_pan_and_driving_licence(
+            page_output,
+            page_output,
+            mask_pan=normalized_type in {"pan", "all"},
+            mask_driving_licence=normalized_type in {"dl", "all"},
+            mask_first8=mask_first8,
+            mask_last4=mask_last4,
+        )
+
+    if mask_qr:
+        if not os.path.exists(page_output):
+            shutil.copy(page_input, page_output)
+        try:
+            from app.services.mask_utils.qreader import mask_qr_code_with_qreader
+
+            result["qr_detected"], result["qr_count"], result["qr_engine"] = mask_qr_code_with_qreader(page_output, page_output)
+        except ModuleNotFoundError:
+            result["qr_warning"] = " QR masking skipped because qreader is not installed."
+            result["qr_engine"] = "not-installed"
+
+    if not os.path.exists(page_output):
+        shutil.copy(page_input, page_output)
+
+    result["masked"] = bool(result["aadhaar_detected"] or result["pan_detected"] or result["dl_detected"])
+    return result
+
+
+def _first(results, key, default=""):
+    for item in results:
+        if item[key]:
+            return item[key]
+    return default
 
 
 def _store_output(output_path, output_filename):
-    """With a remote backend, move the finished masked image to the bucket and drop the local copy."""
+    """With a remote backend, move a finished masked file to the bucket and drop the local copy."""
     remote = remote_storage()
     if remote is None:
         return
-    remote.put_file(output_path, remote.key("masked", output_filename), "image/jpeg")
+    content_type = "application/pdf" if str(output_filename).lower().endswith(".pdf") else "image/jpeg"
+    remote.put_file(output_path, remote.key("masked", output_filename), content_type)
     os.remove(output_path)
 
 
@@ -107,7 +192,13 @@ class MaskResponse:
         profile_linked_documents=None,
         profile_auto_loaded=False,
         profile_key="",
+        page_count=1,
+        masked_pages=None,
+        output_pdf_url="",
     ):
+        self.page_count = int(page_count or 1)
+        self.masked_pages = list(masked_pages or [])
+        self.output_pdf_url = output_pdf_url
         self.error = error
         self.message = message
         self.aadhaar_detected = aadhaar_detected
@@ -193,6 +284,9 @@ class MaskResponse:
             "profileKey": self.profile_key,
             "outputImagePath": self.output_image_path,
             "outputImageUrl": self.output_image_url,
+            "outputPdfUrl": self.output_pdf_url,
+            "pageCount": self.page_count,
+            "maskedPages": self.masked_pages,
             "error": self.error,
         }
 
@@ -242,8 +336,6 @@ def upload_document_and_mask(
     def _build_integrity_token(job_id_value, processed_at_value, input_hash_value, output_hash_value):
         payload = f"{job_id_value}|{processed_at_value}|{input_hash_value}|{output_hash_value}"
         return hmac_sha256(payload, Config.HASH_SECRET)
-
-    from app.services.mask_utils.aadhaar import mask_aadhaar
 
     def _aadhaar_preview(value: str, mask_first8_value: bool, mask_last4_value: bool) -> tuple[str, str, str]:
         digits = "".join(ch for ch in str(value or "") if ch.isdigit())
@@ -296,21 +388,28 @@ def upload_document_and_mask(
 
     normalized_type = str(document_type or "aadhaar").strip().lower()
     input_path = handle_file_upload(file)
-    temp_converted_path = ""
-    input_path_for_processing = input_path
+    page_inputs = [input_path]
+    temp_page_files = []
 
     if str(input_path).lower().endswith(".pdf"):
         try:
-            temp_converted_path = _convert_pdf_first_page_to_jpg(input_path)
-            input_path_for_processing = temp_converted_path
+            page_inputs = _convert_pdf_pages_to_jpgs(input_path, _max_pdf_pages())
+            temp_page_files = list(page_inputs)
         except Exception as exc:
-            if temp_converted_path and os.path.exists(temp_converted_path):
-                os.remove(temp_converted_path)
+            if not _persist_original_uploads_enabled() and os.path.exists(input_path):
+                os.remove(input_path)
+            if isinstance(exc, PdfPageLimitError):
+                return MaskResponse(
+                    error="pdf-too-many-pages",
+                    message=str(exc),
+                    aadhaar_detected=False,
+                    qr_detected=False,
+                    document_type=normalized_type,
+                    page_count=exc.page_count,
+                )
             detail = str(exc).strip()
             if not detail:
                 detail = "unknown PDF parsing error"
-            if not _persist_original_uploads_enabled() and os.path.exists(input_path):
-                os.remove(input_path)
             return MaskResponse(
                 error="pdf-conversion-failed",
                 message=f"Unable to process PDF ({detail}). Ensure the file is valid, not password-protected, and try again.",
@@ -321,9 +420,13 @@ def upload_document_and_mask(
                 document_type=normalized_type,
             )
 
+    page_count = len(page_inputs)
     job_id = uuid.uuid4().hex
     output_filename = f"masked_{job_id}.jpg"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
+    output_pdf_filename = ""
+    output_pdf_path = ""
+    page_tmp_dir = ""
     processed_at = datetime.now(timezone.utc).isoformat()
 
     input_hash = hash_file_sha256(input_path)
@@ -331,66 +434,51 @@ def upload_document_and_mask(
     qr_detected = False
 
     try:
-        aadhaar_detected = False
-        aadhaar_number = ""
-        aadhaar_count = 0
-        pan_detected = False
-        driving_licence_detected = False
-        pan_count = 0
-        driving_licence_count = 0
-        pan_preview = ""
-        driving_licence_preview = ""
-        pan_confidence = 0.0
-        driving_licence_confidence = 0.0
-        pan_pattern = ""
-        driving_licence_pattern = ""
+        # Mask every page. Page 1 is written to the normal output image (also the preview);
+        # further pages go to a temp folder and are only used to build the masked PDF.
+        if page_count > 1:
+            page_tmp_dir = tempfile.mkdtemp(prefix="sdm-pages-")
+        page_outputs = []
+        page_results = []
+        for index, page_input in enumerate(page_inputs):
+            page_output = output_path if index == 0 else os.path.join(page_tmp_dir, f"page_{index + 1}.jpg")
+            page_outputs.append(page_output)
+            page_results.append(_mask_page(page_input, page_output, normalized_type, mask_first8, mask_last4, mask_qr))
 
-        if normalized_type in {"aadhaar", "all"}:
-            aadhaar_detected, aadhaar_number, aadhaar_count = mask_aadhaar(
-                input_path_for_processing, output_path, mask_first8, mask_last4
-            )
-
-        if normalized_type in {"pan", "dl", "all"}:
-            from app.services.mask_utils.document_generic import mask_pan_and_driving_licence
-
-            if not os.path.exists(output_path):
-                shutil.copy(input_path_for_processing, output_path)
-
-            pan_detected, driving_licence_detected, pan_count, driving_licence_count, pan_preview, driving_licence_preview, pan_confidence, driving_licence_confidence, pan_pattern, driving_licence_pattern = (
-                mask_pan_and_driving_licence(
-                    output_path,
-                    output_path,
-                    mask_pan=normalized_type in {"pan", "all"},
-                    mask_driving_licence=normalized_type in {"dl", "all"},
-                    mask_first8=mask_first8,
-                    mask_last4=mask_last4,
-                )
-            )
+        aadhaar_detected = any(r["aadhaar_detected"] for r in page_results)
+        aadhaar_number = _first(page_results, "aadhaar_number")
+        aadhaar_count = sum(int(r["aadhaar_count"] or 0) for r in page_results)
+        pan_detected = any(r["pan_detected"] for r in page_results)
+        driving_licence_detected = any(r["dl_detected"] for r in page_results)
+        pan_count = sum(int(r["pan_count"] or 0) for r in page_results)
+        driving_licence_count = sum(int(r["dl_count"] or 0) for r in page_results)
+        pan_preview = _first(page_results, "pan_value")
+        driving_licence_preview = _first(page_results, "dl_value")
+        pan_confidence = max(r["pan_conf"] for r in page_results)
+        driving_licence_confidence = max(r["dl_conf"] for r in page_results)
+        pan_pattern = _first(page_results, "pan_pattern")
+        driving_licence_pattern = _first(page_results, "dl_pattern")
+        qr_detected = any(r["qr_detected"] for r in page_results)
+        qr_count = sum(int(r["qr_count"] or 0) for r in page_results)
+        qr_engine = next((r["qr_engine"] for r in page_results if r["qr_engine"] != "none"), "none")
+        qr_warning = _first(page_results, "qr_warning")
+        masked_pages = [i + 1 for i, r in enumerate(page_results) if r["masked"] or r["qr_detected"]]
 
         is_masked = aadhaar_detected or pan_detected or driving_licence_detected
 
-        qr_detected = False
-        qr_count = 0
-        qr_engine = "none"
-        qr_warning = ""
-
-        if mask_qr:
-            if not os.path.exists(output_path):
-                # Aadhaar masking may fail to produce an output image; copy input
-                # so QR masking can still run independently.
-                shutil.copy(input_path_for_processing, output_path)
-            try:
-                from app.services.mask_utils.qreader import mask_qr_code_with_qreader
-
-                qr_detected, qr_count, qr_engine = mask_qr_code_with_qreader(output_path, output_path)
-            except ModuleNotFoundError:
-                qr_warning = " QR masking skipped because qreader is not installed."
-                qr_engine = "not-installed"
+        if page_count > 1 and (is_masked or qr_detected):
+            output_pdf_filename = f"masked_{job_id}.pdf"
+            output_pdf_path = os.path.join(OUTPUT_DIR, output_pdf_filename)
+            _build_pdf_from_images(page_outputs, output_pdf_path)
+        primary_output_path = output_pdf_path or output_path
+        output_pdf_url = f"/output/{output_pdf_filename}" if output_pdf_filename else ""
 
         if is_masked:
             aadhaar_hash = hmac_sha256(aadhaar_number, Config.HASH_SECRET) if aadhaar_number else ""
-            output_hash = hash_file_sha256(output_path)
+            output_hash = hash_file_sha256(primary_output_path)
             _store_output(output_path, output_filename)
+            if output_pdf_path:
+                _store_output(output_pdf_path, output_pdf_filename)
             integrity_token = _build_integrity_token(job_id, processed_at, input_hash, output_hash)
             aadhaar_preview, access_challenge_value, access_challenge_type = _aadhaar_preview(
                 aadhaar_number,
@@ -488,6 +576,7 @@ def upload_document_and_mask(
                     access_challenge_value,
                     f"/output/{output_filename}",
                     challenge_type=access_challenge_type,
+                    output_pdf_url=output_pdf_url,
                 )
                 access_challenge_hint = "Use visible characters left after masking"
             elif pan_challenge_value:
@@ -496,6 +585,7 @@ def upload_document_and_mask(
                     pan_challenge_value,
                     f"/output/{output_filename}",
                     challenge_type=pan_challenge_type or "visible_fragment",
+                    output_pdf_url=output_pdf_url,
                 )
                 access_challenge_available = True
                 access_challenge_type = pan_challenge_type or "visible_fragment"
@@ -506,6 +596,7 @@ def upload_document_and_mask(
                     dl_challenge_value,
                     f"/output/{output_filename}",
                     challenge_type=dl_challenge_type or "visible_fragment",
+                    output_pdf_url=output_pdf_url,
                 )
                 access_challenge_available = True
                 access_challenge_type = dl_challenge_type or "visible_fragment"
@@ -520,6 +611,7 @@ def upload_document_and_mask(
                         fallback_secret,
                         f"/output/{output_filename}",
                         challenge_type="fallback_secret",
+                        output_pdf_url=output_pdf_url,
                     )
                     access_challenge_available = True
                     access_challenge_type = "fallback_secret"
@@ -567,11 +659,16 @@ def upload_document_and_mask(
                 profile_linked_documents=profile_linked_documents,
                 profile_auto_loaded=profile_auto_loaded,
                 profile_key=profile_key,
+                page_count=page_count,
+                masked_pages=masked_pages,
+                output_pdf_url=output_pdf_url,
             )
 
         if qr_detected:
-            output_hash = hash_file_sha256(output_path)
+            output_hash = hash_file_sha256(primary_output_path)
             _store_output(output_path, output_filename)
+            if output_pdf_path:
+                _store_output(output_pdf_path, output_pdf_filename)
             integrity_token = _build_integrity_token(job_id, processed_at, input_hash, output_hash)
             return MaskResponse(
                 error="",
@@ -605,6 +702,9 @@ def upload_document_and_mask(
                 identity_vault_enabled=False,
                 identity_pin_mode="",
                 identity_pin_hint="",
+                page_count=page_count,
+                masked_pages=masked_pages,
+                output_pdf_url=output_pdf_url,
             )
 
         return MaskResponse(
@@ -628,14 +728,18 @@ def upload_document_and_mask(
             identity_vault_enabled=False,
             identity_pin_mode="",
             identity_pin_hint="",
+            page_count=page_count,
         )
 
     finally:
         remote = remote_storage()
-        # Never leave an unmasked working copy behind: drop it when nothing was masked,
-        # or (remote storage) when it was not moved to the bucket.
-        if os.path.exists(output_path) and (remote is not None or not (is_masked or qr_detected)):
-            os.remove(output_path)
+        # Never leave an unmasked working copy behind: drop outputs when nothing was masked,
+        # or (remote storage) when they were not moved to the bucket.
+        for leftover in (output_path, output_pdf_path):
+            if leftover and os.path.exists(leftover) and (remote is not None or not (is_masked or qr_detected)):
+                os.remove(leftover)
+        if page_tmp_dir:
+            shutil.rmtree(page_tmp_dir, ignore_errors=True)
         if os.path.exists(input_path):
             if not _persist_original_uploads_enabled():
                 os.remove(input_path)
@@ -645,8 +749,9 @@ def upload_document_and_mask(
                     os.remove(input_path)
                 except Exception:
                     pass  # keep the local copy rather than lose the original
-        if temp_converted_path and os.path.exists(temp_converted_path):
-            os.remove(temp_converted_path)
+        for temp_path in temp_page_files:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
 
 def verify_integrity_token(job_id, processed_at, input_file_hash, output_file_hash, integrity_token):

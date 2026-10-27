@@ -115,5 +115,7 @@ class Config:
     STORAGE_CLEANUP_AT_STARTUP = _env_bool('STORAGE_CLEANUP_AT_STARTUP', True)
     TESSERACT_CMD = _env_text('TESSERACT_CMD', r'C:\Program Files\Tesseract-OCR\tesseract.exe')
     PDF_RENDER_DPI = max(120, min(300, int(os.environ.get('PDF_RENDER_DPI', 180))))
+    # PDFs with more pages than this are rejected (every page is OCR'd, so cost grows per page).
+    MAX_PDF_PAGES = max(1, min(100, int(os.environ.get('MAX_PDF_PAGES', 20))))
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # Max file size is 10 MB

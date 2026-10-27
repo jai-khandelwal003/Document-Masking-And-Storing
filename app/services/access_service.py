@@ -910,7 +910,7 @@ def get_identity_pin_hint(job_id):
     return "Use last 4 characters as PIN"
 
 
-def register_job_for_access(job_id, challenge_value, output_image_url, challenge_type="last4"):
+def register_job_for_access(job_id, challenge_value, output_image_url, challenge_type="last4", output_pdf_url=""):
     normalized_type = str(challenge_type or "last4").strip().lower()
     if normalized_type == "last4":
         verifier = _normalize_last4(challenge_value)
@@ -927,6 +927,7 @@ def register_job_for_access(job_id, challenge_value, output_image_url, challenge
             "verifier": verifier,
             "challengeType": normalized_type,
             "output_image_url": output_image_url,
+            "output_pdf_url": output_pdf_url or "",
             "created_at": time.time(),
         }
         _save_state_locked()
@@ -1041,21 +1042,27 @@ def verify_access_code(job_id, last4, visible_fragment, fallback_pin, code):
         _save_state_locked()
 
     serializer = URLSafeTimedSerializer(current_app.config.get("SECRET_KEY", ""), salt="aadhaar-output-access")
+    pdf_url = str(job.get("output_pdf_url", "") or "")
     payload = {
         "jobId": job_id,
         "outputImageUrl": job.get("output_image_url", ""),
     }
+    if pdf_url:
+        payload["outputPdfUrl"] = pdf_url
     token = serializer.dumps(payload)
 
-    return True, {
+    response_body = {
         "message": "Access granted",
         "accessToken": token,
         "expiresInSec": token_ttl,
         "secureDownloadUrl": f"/output/secure?token={quote(token)}",
-    }, 200
+    }
+    if pdf_url:
+        response_body["securePdfDownloadUrl"] = f"/output/secure?token={quote(token)}&format=pdf"
+    return True, response_body, 200
 
 
-def resolve_secure_output_filename(access_token):
+def resolve_secure_output_filename(access_token, kind="image"):
     token_ttl = max(30, int(current_app.config.get("ACCESS_TOKEN_TTL_SECONDS", 300)))
     serializer = URLSafeTimedSerializer(current_app.config.get("SECRET_KEY", ""), salt="aadhaar-output-access")
 
@@ -1066,7 +1073,7 @@ def resolve_secure_output_filename(access_token):
     except BadSignature as exc:
         raise ValueError("Invalid access token") from exc
 
-    output_image_url = str(payload.get("outputImageUrl", ""))
+    output_image_url = str(payload.get("outputPdfUrl" if kind == "pdf" else "outputImageUrl", ""))
     if not output_image_url.startswith("/output/"):
         raise ValueError("Invalid token payload")
 

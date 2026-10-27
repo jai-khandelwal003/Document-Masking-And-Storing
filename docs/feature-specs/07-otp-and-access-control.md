@@ -10,7 +10,8 @@ The masked output is served openly under `/output/<file>`, but retrieving it thr
 2. `POST /access/request-code` `{jobId, last4 | visibleFragment | fallbackPin}` → 6-digit code (shown in the response only if `ACCESS_SHOW_CODE=true`).
 3. `POST /access/verify` `{..., code}` → signed token (`URLSafeTimedSerializer`, salt `aadhaar-output-access`).
 4. `GET /output/secure?token=...` returns the file. Token lifetime `ACCESS_TOKEN_TTL_SECONDS` (default 300 s).
-5. `GET /output/<file>` is only served to the session that created the file (tracked in `session["owned_outputs"]`, last 50); anyone else gets 403 and must use this flow.
+5. For multi-page PDFs the verify response also has `securePdfDownloadUrl` (`/output/secure?token=...&format=pdf`); the token carries both files of the job.
+6. `GET /output/<file>` is only served to the session that created the file (tracked in `session["owned_outputs"]`, last 50); anyone else gets 403 and must use this flow.
 
 ## Flow B – Identity vault unlock (`/identity/*`)
 1. `POST /identity/request-otp` `{jobId, recipientEmail}` → OTP via the configured provider:

@@ -22,11 +22,12 @@ def _client_ip():
 def _remember_output(result):
     # Only the session that created a masked file may fetch it from /output/<file>;
     # everyone else must go through the OTP-protected /output/secure flow.
-    name = os.path.basename(str(result.get("outputImageUrl", "") or ""))
-    if not name:
+    names = [os.path.basename(str(result.get(key, "") or "")) for key in ("outputImageUrl", "outputPdfUrl")]
+    names = [n for n in names if n]
+    if not names:
         return
-    owned = [n for n in session.get("owned_outputs", []) if n != name]
-    owned.append(name)
+    owned = [n for n in session.get("owned_outputs", []) if n not in names]
+    owned.extend(names)
     session["owned_outputs"] = owned[-50:]
 def _param(name, default="", sources=None):
     sources = sources or [request.form, request.args, request.headers]

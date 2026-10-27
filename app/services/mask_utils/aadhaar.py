@@ -18,6 +18,20 @@ from app.services.mask_utils.aadhar_helpers import (
 os.environ.setdefault("TESSDATA_PREFIX", "./resources/4.0.01/")
 
 
+def _already_masked(box, masked_boxes, threshold=0.5):
+    """True if `box` mostly overlaps a box that was already masked (same number seen by another OCR pass)."""
+    x1, y1, x2, y2 = box
+    area = max(1, (x2 - x1) * (y2 - y1))
+    for mx1, my1, mx2, my2 in masked_boxes:
+        overlap_w = min(x2, mx2) - max(x1, mx1)
+        overlap_h = min(y2, my2) - max(y1, my1)
+        if overlap_w > 0 and overlap_h > 0:
+            smaller = min(area, max(1, (mx2 - mx1) * (my2 - my1)))
+            if (overlap_w * overlap_h) / smaller >= threshold:
+                return True
+    return False
+
+
 def mask_aadhaar(
     image_path: str,
     output_path: str,
@@ -64,6 +78,7 @@ def mask_aadhaar(
     masked_count = 0
     aadhaar_number = ""
     seen_rects = set()
+    masked_boxes = []
 
     for data in (_ocr_data(processed, 6), _ocr_data(processed, 11), _ocr_data(binary, 6)):
         ocr_runs.append(data)
@@ -88,9 +103,10 @@ def mask_aadhaar(
                 int(max_x / 25),
                 int(max_y / 25),
             )
-            if key in seen_rects:
+            if key in seen_rects or _already_masked((min_x, min_y, max_x, max_y), masked_boxes):
                 continue
             seen_rects.add(key)
+            masked_boxes.append((min_x, min_y, max_x, max_y))
 
             mask_group = group
             if mask_first8 and not mask_last4:
@@ -107,9 +123,8 @@ def mask_aadhaar(
 
             masked_count += 1
 
-        # Early exit for performance once at least one valid Aadhaar hit is found.
-        if masked_count > 0:
-            break
+        # Keep going after a hit: a later OCR pass can read a different number on the same page
+        # that the first successful pass missed. All three passes already ran, so this costs nothing.
 
     # Additional pass: if one Aadhaar number was detected, mask repeated
     # occurrences of the same number elsewhere in the image.

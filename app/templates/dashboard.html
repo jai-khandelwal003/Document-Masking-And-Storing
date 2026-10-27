@@ -6156,7 +6156,7 @@
           }
 
           if (secureDownload) {
-            secureDownload.href = data.secureDownloadUrl || "#";
+            secureDownload.href = data.securePdfDownloadUrl || data.secureDownloadUrl || "#";
             secureDownload.style.display = "inline-flex";
           }
           if (secureNote) {
@@ -6197,7 +6197,7 @@
         }
 
         if (secureDownload) {
-          secureDownload.href = data.secureDownloadUrl || "#";
+          secureDownload.href = data.securePdfDownloadUrl || data.secureDownloadUrl || "#";
           secureDownload.style.display = "inline-flex";
         }
         if (secureNote) {
@@ -7362,6 +7362,7 @@
 
       const entries = [
         ["Document type", data.documentType || "aadhaar"],
+        ["Pages", Number(data.pageCount || 1) > 1 ? `${data.pageCount} (masked on page ${(data.maskedPages || []).join(", ") || "none"})` : "1"],
         ["Aadhaar detected", boolLabel(data.aadhaarDetected)],
         ["Aadhaar count", String(data.noOfAadhaarDetected || 0)],
         ["PAN detected", boolLabel(data.panDetected)],
@@ -7454,7 +7455,8 @@
         previewAfterEl.src = withCacheBust;
         compareAfter.src = withCacheBust;
         diffCanvas.style.display = "none";
-        downloadEl.href = imageUrl;
+        downloadEl.href = data.outputPdfUrl || imageUrl;
+        downloadEl.textContent = data.outputPdfUrl ? "Download Masked PDF" : "Download Masked Image";
         renderMeta(data);
         setupSecureAccess(data);
         setupIdentityAccess(data);

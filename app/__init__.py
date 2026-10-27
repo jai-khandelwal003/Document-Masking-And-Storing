@@ -99,7 +99,10 @@ def _apply_runtime_guardrails(app):
 
 
 def _resolve_output_dir(app: Flask) -> str:
-    return os.path.abspath(os.path.join(app.root_path, "..", "output"))
+    # Serve from the folder the masking service writes to, so the two can never disagree.
+    from app.services import mask_service
+
+    return os.path.abspath(mask_service.OUTPUT_DIR)
 
 
 def _register_blueprints(app: Flask) -> None:
@@ -179,7 +182,8 @@ def create_app():
             return jsonify({"error": "File not found"}), 404
         except StorageError:
             return jsonify({"error": "Storage unavailable"}), 502
-        return send_file(io.BytesIO(data), mimetype="image/jpeg", download_name=name)
+        mimetype = "application/pdf" if name.lower().endswith(".pdf") else "image/jpeg"
+        return send_file(io.BytesIO(data), mimetype=mimetype, download_name=name)
 
     @app.route("/output/<path:filename>")
     def output_file(filename):
@@ -193,8 +197,9 @@ def create_app():
         if not token:
             return jsonify({"error": "Missing access token"}), 400
 
+        kind = "pdf" if request.args.get("format") == "pdf" else "image"
         try:
-            filename = resolve_secure_output_filename(token)
+            filename = resolve_secure_output_filename(token, kind)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 401
 

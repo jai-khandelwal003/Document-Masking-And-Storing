@@ -43,7 +43,30 @@ def _f1(precision, recall):
 def _make_poster(base_url, timeout_sec, in_process, cookie="", api_key=""):
     """Return post_mask(filename, fileobj, data) -> (status, json, latency_ms, body_text)."""
     if in_process:
+        # Run entirely in a throwaway folder so benchmarking never touches real documents, databases or logs.
+        import atexit
+        import shutil
+        import tempfile
+        from unittest.mock import patch
+
+        sandbox = tempfile.mkdtemp(prefix="sdm-eval-")
+        atexit.register(shutil.rmtree, sandbox, ignore_errors=True)
+        os.environ.update(
+            {
+                "IDENTITY_DOCS_DIR": os.path.join(sandbox, "identity_docs"),
+                "ACCESS_STATE_DB_PATH": os.path.join(sandbox, "access_state.sqlite3"),
+                "IDENTITY_DB_PATH": os.path.join(sandbox, "identity_profiles.sqlite3"),
+                "AUDIT_LOG_PATH": os.path.join(sandbox, "audit.log"),
+                "ORIGINAL_UPLOADS_DIR": os.path.join(sandbox, "uploads"),
+                "UPLOAD_FOLDER": os.path.join(sandbox, "uploads_tmp"),
+            }
+        )
         from app import create_app
+        from app.services import mask_service
+
+        sandbox_output = os.path.join(sandbox, "output")
+        os.makedirs(sandbox_output)
+        patch.object(mask_service, "OUTPUT_DIR", sandbox_output).start()
 
         app = create_app()
         app.config.update(TESTING=True, RATE_LIMIT_ENABLED=False, API_KEY_REQUIRED=False)

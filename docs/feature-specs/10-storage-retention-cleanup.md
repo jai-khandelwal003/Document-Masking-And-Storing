@@ -4,7 +4,7 @@
 Sensitive files must not live forever. A cleanup job deletes old data by age.
 
 ## Behavior (`app/services/storage_cleanup.py`)
-Runs at startup when `STORAGE_CLEANUP_ENABLED=true` and `STORAGE_CLEANUP_AT_STARTUP=true` (skipped in tests). Files with an mtime older than `STORAGE_RETENTION_DAYS` (min 1, default 30) are removed from:
+**Runs every time the app is created** (server start, or any script calling `create_app()`), so it will delete files older than the retention period without asking. It runs when `STORAGE_CLEANUP_ENABLED=true` and `STORAGE_CLEANUP_AT_STARTUP=true` (skipped in tests). Files with an mtime older than `STORAGE_RETENTION_DAYS` (min 1, default 30) are removed from:
 1. `ORIGINAL_UPLOADS_DIR` (saved originals)
 2. `output/identity_docs/` (vault uploads)
 3. `output/masked_*` (generated masked images only)

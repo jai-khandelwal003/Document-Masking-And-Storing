@@ -73,7 +73,13 @@ S3_SECRET_ACCESS_KEY=...
 - **Rate limiting** is per process and uses `X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true` (set for the bundled nginx).
 - **OCR accuracy** is modest on noisy images; see `evaluation/RESULTS.md` for measured numbers (synthetic data only).
 - **Tests are isolated** from your real `output/` folder (they run against a temp directory), so running them is safe.
-- PDFs: only the first page is processed. Original uploads are deleted after processing unless `PERSIST_ORIGINAL_UPLOADS=true`.
+- **PDFs:** every page is rendered, OCR'd and masked. A multi-page PDF returns a rebuilt masked PDF (image-only, so the
+  original text layer is dropped) plus a page-1 preview image. PDFs longer than `MAX_PDF_PAGES` (default 20) are rejected
+  instead of being half-processed, and password-protected PDFs are refused. Expect roughly 1-3 s of OCR per page.
+- **Startup cleanup deletes data.** With `STORAGE_CLEANUP_ENABLED=true` the app deletes masked images, kept originals and vault
+  files older than `STORAGE_RETENTION_DAYS` every time it starts (including when a script imports `create_app`). Turn it off
+  if you want to keep old files.
+- Original uploads are deleted after processing unless `PERSIST_ORIGINAL_UPLOADS=true`.
 
 ## Panel Demo Guide
 

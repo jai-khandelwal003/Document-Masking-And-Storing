@@ -5,7 +5,7 @@
       "precision": 0.7273,
       "recall": 0.8,
       "f1": 0.7619,
-      "avgTimeMs": 1166,
+      "avgTimeMs": 1277,
       "samples": 16
     },
     {
@@ -13,7 +13,7 @@
       "precision": 1.0,
       "recall": 0.4,
       "f1": 0.5714,
-      "avgTimeMs": 843,
+      "avgTimeMs": 1031,
       "samples": 13
     },
     {
@@ -21,7 +21,7 @@
       "precision": 1.0,
       "recall": 1.0,
       "f1": 1.0,
-      "avgTimeMs": 650,
+      "avgTimeMs": 791,
       "samples": 13
     },
     {
@@ -37,7 +37,7 @@
       "precision": 0.88,
       "recall": 0.7333,
       "f1": 0.8,
-      "avgTimeMs": 907,
+      "avgTimeMs": 1050,
       "samples": 42
     }
   ]
