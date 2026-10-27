@@ -1,0 +1,24 @@
+{
+  "name": "Smart Document Masking",
+  "short_name": "SDM",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1b2a",
+  "theme_color": "#0d1b2a",
+  "description": "Premium SaaS-style document masking dashboard for Aadhaar, PAN, and Driving Licence workflows.",
+  "icons": [
+    {
+      "src": "/static/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

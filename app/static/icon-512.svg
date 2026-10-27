@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Smart Document Masking">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1d9e75"/>
+      <stop offset="100%" stop-color="#378add"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="#0d1b2a"/>
+  <rect x="60" y="60" width="392" height="392" rx="88" fill="url(#g)" opacity="0.16"/>
+  <text x="256" y="268" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="120" font-weight="700" fill="#e8f4f0">SDM</text>
+  <circle cx="388" cy="124" r="24" fill="#ef9f27"/>
+</svg>

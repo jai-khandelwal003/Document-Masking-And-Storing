@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); })();</script>
+  <title>Login | Smart Document Masking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    html[data-theme="dark"] {
+      --bg: #0d1b2a;
+      --surface: rgba(36, 59, 83, 0.54);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #e8f4f0;
+      --muted: #8ab3a8;
+      --accentA: #1d9e75;
+      --accentB: #378add;
+      --danger: #e24b4a;
+    }
+
+    html[data-theme="light"],
+    html[data-theme="auto"] {
+      --bg: #f2f7ff;
+      --surface: rgba(255, 255, 255, 0.84);
+      --line: rgba(31, 64, 98, 0.2);
+      --text: #1a3047;
+      --muted: #4f718f;
+      --accentA: #0f7e66;
+      --accentB: #1f69c6;
+      --danger: #c13d3d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "DM Sans", "Segoe UI", sans-serif;
+      overflow: hidden;
+      padding: 24px;
+    }
+
+    .orb {
+      position: fixed;
+      width: 520px;
+      height: 520px;
+      border-radius: 999px;
+      pointer-events: none;
+      filter: blur(10px);
+      opacity: 0.32;
+      z-index: 0;
+      background: radial-gradient(circle at 30% 30%, rgba(29, 158, 117, 0.82), rgba(55, 138, 221, 0.18) 55%, rgba(13, 27, 42, 0));
+      animation: orbDrift 13s ease-in-out infinite alternate;
+    }
+
+    .orb.secondary {
+      width: 420px;
+      height: 420px;
+      right: -120px;
+      bottom: -100px;
+      opacity: 0.23;
+      animation-duration: 16s;
+      animation-direction: alternate-reverse;
+    }
+
+    @keyframes orbDrift {
+      from { transform: translate3d(-26px, -14px, 0) scale(1); }
+      to { transform: translate3d(18px, 24px, 0) scale(1.06); }
+    }
+
+    .card {
+      width: min(440px, 100%);
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 0.5px solid var(--line);
+      border-radius: 18px;
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 30px 70px rgba(2, 10, 20, 0.54);
+      padding: 28px;
+      animation: riseIn 400ms ease both;
+    }
+
+    .card.shake {
+      animation: cardShake 320ms ease;
+    }
+
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes cardShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .brand-mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #e9fbff;
+      background: linear-gradient(140deg, var(--accentA), var(--accentB));
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 23px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      margin: 6px 0 22px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      border: 0.5px solid var(--line);
+      border-radius: 10px;
+      background: rgba(12, 27, 42, 0.75);
+      color: var(--text);
+      padding: 12px 40px 12px 12px;
+      font: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    input:focus {
+      border-color: rgba(29, 158, 117, 0.78);
+      box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.18);
+    }
+
+    .eye {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 0;
+      color: #9ec6bd;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .signin {
+      width: 100%;
+      margin-top: 6px;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: inherit;
+      font-weight: 500;
+      color: #ecfffa;
+      background: linear-gradient(135deg, var(--accentA), var(--accentB));
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .signin:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(29, 158, 117, 0.28); }
+    .signin:disabled { opacity: 0.88; cursor: wait; }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      animation: spin 700ms linear infinite;
+      display: none;
+    }
+
+    .signin.loading .spinner { display: inline-block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error {
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    .lockout {
+      margin-top: 8px;
+      color: #ef9f27;
+      font-size: 12px;
+      min-height: 16px;
+    }
+
+    .demo {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      border: 0.5px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: #b8d9cf;
+      background: rgba(9, 20, 30, 0.72);
+    }
+  </style>
+</head>
+<body>
+  <div class="orb" aria-hidden="true"></div>
+  <div class="orb secondary" aria-hidden="true"></div>
+
+  <section class="card{% if error %} shake{% endif %}" id="login-card">
+    <div class="brand">
+      <span class="brand-mark">SDM</span>
+      <div>
+        <h1>Smart Document Masking</h1>
+        <p class="subtitle">Secure OCR Redaction Engine</p>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('auth.login', next=request.args.get('next', '')) }}" id="login-form" novalidate>
+      <div class="field">
+        <label class="label" for="user_id">User ID</label>
+        <div class="input-wrap">
+          <input id="user_id" name="user_id" type="text" autocomplete="username" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">Password</label>
+        <div class="input-wrap">
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="eye" type="button" id="toggle-password" aria-label="Toggle password visibility">Show</button>
+        </div>
+      </div>
+
+      <button class="signin" id="signin-btn" type="submit">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Sign In</span>
+      </button>
+
+      <div class="error" role="alert">{% if error %}{{ error }}{% endif %}</div>
+      <div class="lockout" id="lockout-msg"></div>
+
+      {% if show_login_hints %}
+      <div class="demo" aria-label="Demo credentials">
+        <span class="pill">USER_ID={{ demo_user }}</span>
+        <span class="pill">USER_PASSWORD={{ demo_password }}</span>
+      </div>
+      {% endif %}
+    </form>
+  </section>
+
+  <script>
+    const passwordInput = document.getElementById("password");
+    const togglePassword = document.getElementById("toggle-password");
+    const loginForm = document.getElementById("login-form");
+    const signInButton = document.getElementById("signin-btn");
+    const lockoutMsg = document.getElementById("lockout-msg");
+    let remaining = Number({{ retry_after | default(0) }} || 0);
+
+    togglePassword.addEventListener("click", () => {
+      const isPassword = passwordInput.type === "password";
+      passwordInput.type = isPassword ? "text" : "password";
+      togglePassword.textContent = isPassword ? "Hide" : "Show";
+    });
+
+    loginForm.addEventListener("submit", () => {
+      signInButton.disabled = true;
+      signInButton.classList.add("loading");
+    });
+
+    function tickLockout() {
+      if (!lockoutMsg) {
+        return;
+      }
+      if (remaining <= 0) {
+        lockoutMsg.textContent = "";
+        signInButton.disabled = false;
+        signInButton.classList.remove("loading");
+        return;
+      }
+      lockoutMsg.textContent = `Login locked for ${remaining}s`;
+      signInButton.disabled = true;
+      remaining -= 1;
+      setTimeout(tickLockout, 1000);
+    }
+
+    if (remaining > 0) {
+      tickLockout();
+    }
+  </script>
+</body>
+</html>

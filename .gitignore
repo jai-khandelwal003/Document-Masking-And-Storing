@@ -1,0 +1,28 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+deployment/certs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editors
+.vscode/
+.idea/
+
+# Runtime data (contains personal identity documents)
+output/
+.images/
+.test-images/
+masked_images/
+masked_aadhaar.png
+backup/
+*.bak.zip
+*.log
+*.sqlite3

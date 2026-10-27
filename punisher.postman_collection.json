@@ -1,0 +1,63 @@
+{
+	"info": {
+		"_postman_id": "411aa8ae-2f40-4272-9ad5-33794e91d550",
+		"name": "punisher",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24556900"
+	},
+	"item": [
+		{
+			"name": "ping",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "mask-aadhar",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "last4Mask",
+						"value": "false",
+						"type": "text"
+					},
+					{
+						"key": "first8Mask",
+						"value": "true",
+						"type": "text"
+					},
+					{
+						"key": "maskQr",
+						"value": "true",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/Users/pavan/Downloads/image (1).png"
+						}
+					]
+				},
+				"url": {
+					"raw": "localhost:3000/mask/aadhar",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"mask",
+						"aadhar"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,4 @@
+filename,document_type,expected_detected
+sample_1.png,aadhaar,1
+sample_2.png,pan,0
+sample_3.png,dl,0
