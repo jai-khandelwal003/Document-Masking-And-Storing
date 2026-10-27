@@ -170,6 +170,14 @@ class SessionCookieTests(SecurityTestBase):
         self.assertIn("SESSION_COOKIE_SECURE", str(ctx.exception))
 
 
+class FaviconTests(SecurityTestBase):
+    def test_favicon_redirects_to_the_icon_without_login(self):
+        response = self.client.get("/favicon.ico")
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response.headers["Location"].endswith("/static/icon-192.svg"))
+        self.assertEqual(self.client.get("/static/icon-192.svg").status_code, 200)
+
+
 class ServiceWorkerTests(unittest.TestCase):
     def setUp(self):
         path = os.path.join(os.path.dirname(__file__), "..", "app", "static", "sw.js")

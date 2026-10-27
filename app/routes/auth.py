@@ -36,6 +36,7 @@ _PUBLIC_ENDPOINTS = {
     "auth.login",
     "auth.clerk_session",
     "health.health",
+    "auth.favicon",
     "static",
 }
 
@@ -239,6 +240,11 @@ def logout():
     if _auth_provider() == "clerk":
         return _render_clerk_page(logout=True)
     return redirect(url_for("auth.login"))
+
+
+@bp.route("/favicon.ico", methods=["GET"])
+def favicon():
+    return redirect(url_for("static", filename="icon-192.svg"), code=301)
 
 
 @bp.route("/dashboard", methods=["GET"])
