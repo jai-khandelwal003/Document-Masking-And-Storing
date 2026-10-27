@@ -19,7 +19,7 @@ Let load balancers and operators check liveness and dependency readiness.
 Otherwise 401.
 
 ## Edge cases
-- Both routes still pass through the login check in `before_request`; for monitoring, either whitelist `/health` or send a session.
+- `GET /health` is public (it only returns status, service name and version) so load balancers and uptime monitors work. `/health/details` still requires login plus the token rules above.
 - Details expose local paths (`dbPath`, directories); keep the token secret.
 
 ## Acceptance criteria

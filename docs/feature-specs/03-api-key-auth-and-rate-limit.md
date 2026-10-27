@@ -5,7 +5,7 @@ Protect the UI and the masking API with three layers: session login (local or Cl
 
 ## Behavior
 **Session login** (`app/routes/auth.py`)
-- `app.before_request` calls `enforce_login()`. Only `auth.login`, `auth.clerk_session` and `static` are public.
+- `app.before_request` calls `enforce_login()`. Only `auth.login`, `auth.clerk_session`, `health.health` (`GET /health`, liveness only) and `static` are public.
 - Unauthenticated API-like requests (`/mask/`, `/access/`, `/identity/`, `/health`, `/output/`, JSON/XHR, non-GET) get `401 {"error": "Authentication required"}`; browser GETs redirect to `/login?next=...`.
 - `POST /login` compares `user_id`/`password` with `hmac.compare_digest`. `next` is only honored if it starts with `/` and not `//` (open-redirect guard).
 - `POST /auth/change-password` (login required, local provider only) needs the current password and a new one of 6+ chars. It is stored as a hash in `output/access_state.sqlite3` (`app/models/auth_store.py`) and survives restarts.

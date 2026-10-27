@@ -35,6 +35,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[]) if Limiter is 
 _PUBLIC_ENDPOINTS = {
     "auth.login",
     "auth.clerk_session",
+    "health.health",
     "static",
 }
 

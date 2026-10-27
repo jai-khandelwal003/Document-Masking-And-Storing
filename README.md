@@ -27,7 +27,7 @@ Production refuses to start with the default or a short password.
   so the container runs `gunicorn -w 1 --threads 8`. Do not add workers without moving that state fully into a database.
 - **Masked output access.** `/output/<file>` is served only to the session that created it. Anyone else must use the
   fragment + one-time-code flow (`/output/secure`). Lose the session and you need the code flow.
-- **Login required everywhere**, including `/health`; whitelist it at the proxy for uptime checks (`/health/details` needs a token).
+- **Login required everywhere** except `/login` and `GET /health` (liveness only); `/health/details` needs login plus a token.
 - **Rate limiting** is per process and uses `X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true` (set for the bundled nginx).
 - **OCR accuracy** is modest on noisy images; see `evaluation/RESULTS.md` for measured numbers (synthetic data only).
 - PDFs: only the first page is processed. Original uploads are deleted after processing unless `PERSIST_ORIGINAL_UPLOADS=true`.

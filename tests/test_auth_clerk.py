@@ -328,5 +328,20 @@ class ProductionGuardrailTests(unittest.TestCase):
             _apply_runtime_guardrails(self._app(CLERK_ALLOWED_EMAILS="owner@example.com", **base))
 
 
+class HealthPublicTests(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app()
+        self.app.config.update(TESTING=True)
+        self.client = self.app.test_client()
+
+    def test_health_is_public_without_login(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "UP")
+
+    def test_health_details_still_requires_login(self):
+        self.assertEqual(self.client.get("/health/details").status_code, 401)
+
+
 if __name__ == "__main__":
     unittest.main()
