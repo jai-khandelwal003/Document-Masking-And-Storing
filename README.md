@@ -63,6 +63,13 @@ S3_SECRET_ACCESS_KEY=...
   literals, `.env` files, certificates, databases or anything under `output/`. Enable it once per clone with
   `make hooks` (or `git config core.hooksPath .githooks`). Add `secret-scan: ignore` to a line for a deliberate false positive.
 
+## Animations
+
+The site has a small motion layer (`app/static/motion.css`, `motion.js`): a scan line and progress sweep while a document
+is processed, step and success animations (check mark, confetti), toasts, count-up numbers, tab and card transitions.
+It uses no libraries, works under the content-security-policy, and is switched off entirely for users who enable
+"reduce motion" in their operating system. See `docs/feature-specs/14-motion-and-animations.md`.
+
 ## Known limitations
 
 - **Single worker by design.** Access codes, OTPs and the identity vault are kept in process memory (snapshotted to SQLite),

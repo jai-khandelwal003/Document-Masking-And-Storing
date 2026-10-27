@@ -19,6 +19,7 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_pdf_pages.py` | multi-page PDFs: every page masked, image-only output PDF (no text layer), limits, encryption, secure/owner access, remote storage |
 | `test_aadhaar_masker.py` | masker with mocked OCR: numbers found by different passes, dedupe, overlap |
 | `test_rate_limits.py` | code/OTP/identity/login limits, 429 JSON, per-endpoint buckets, client-address rules, forged `X-Forwarded-For` |
+| `test_motion_assets.py` | animation files served and linked, reduced-motion support, keyframes defined, selectors scoped (guards the invisible-dashboard bug) |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.

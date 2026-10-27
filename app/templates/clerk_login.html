@@ -18,16 +18,46 @@
     p.sub { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; }
     #clerk-root { display: flex; justify-content: center; min-height: 48px; }
     .msg { margin-top: 16px; font-size: 0.92rem; color: var(--muted); }
-    .msg.error { color: var(--danger); }
+    .msg.error { color: var(--danger); animation: m-shake 480ms var(--m-ease, ease); }
+    .msg.busy::before {
+      content: "";
+      display: inline-block;
+      width: 0.95em;
+      height: 0.95em;
+      margin-right: 0.55em;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      vertical-align: -0.12em;
+      animation: m-spin 0.8s linear infinite;
+    }
+    .msg.done { color: var(--text); }
+    .msg.done::before {
+      content: "¹3";
+      display: inline-grid;
+      place-items: center;
+      width: 1.4em;
+      height: 1.4em;
+      margin-right: 0.55em;
+      border-radius: 50%;
+      background: #1d9e75;
+      color: #fff;
+      font-size: 0.85em;
+      font-weight: 700;
+      animation: m-check 520ms var(--m-spring, ease);
+    }
+    .card { animation: m-rise 520ms var(--m-ease, ease) backwards; }
+    .card.done { border-color: #1d9e75; transition: border-color 300ms ease; }
     noscript { color: var(--danger); }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='motion.css') }}?v=1">
 </head>
 <body>
   <main class="card">
     <h1>{{ branding.projectTitle }}</h1>
     <p class="sub">{{ 'Signing you out...' if logout else 'Sign in to continue' }}</p>
     <div id="clerk-root"></div>
-    <p id="status" class="msg" role="status" aria-live="polite">
+    <p id="status" class="msg{% if configured %} busy{% endif %}" role="status" aria-live="polite">
       {% if not configured %}Clerk is not configured. Set CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY, or use AUTH_PROVIDER=local.{% else %}Loading...{% endif %}
     </p>
     <noscript><p>JavaScript is required to sign in.</p></noscript>
@@ -47,15 +77,21 @@
       var statusEl = document.getElementById('status');
       var exchanging = false;
 
-      function setStatus(text, isError) {
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // state: '' (plain), 'error', 'busy' (spinner) or 'done' (check mark)
+      function setStatus(text, state) {
         statusEl.textContent = text;
-        statusEl.className = 'msg' + (isError ? ' error' : '');
+        statusEl.className = 'msg' + (state === true ? ' error' : state ? ' ' + state : '');
+        if (state === 'done') {
+          statusEl.closest('.card').classList.add('done');
+        }
       }
 
       async function exchange() {
         if (exchanging) return;
         exchanging = true;
-        setStatus('Verifying your session...');
+        setStatus('Verifying your session...', 'busy');
         try {
           var token = await window.Clerk.session.getToken();
           var resp = await fetch('/auth/clerk/session', {
@@ -65,7 +101,10 @@
           });
           var data = await resp.json().catch(function () { return {}; });
           if (resp.ok) {
-            window.location.replace(data.redirect || '/dashboard');
+            setStatus('Signed in. Opening your dashboard...', 'done');
+            window.setTimeout(function () {
+              window.location.replace(data.redirect || '/dashboard');
+            }, reduceMotion ? 0 : 650);
             return;
           }
           setStatus(data.error || 'Sign-in was rejected.', true);
