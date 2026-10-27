@@ -69,6 +69,12 @@ class Config:
     CLERK_ALLOW_ANY_USER = _env_bool('CLERK_ALLOW_ANY_USER', False)
     TRUST_PROXY_HEADERS = _env_bool('TRUST_PROXY_HEADERS', False)
     RATE_LIMIT_ENABLED = _env_bool('RATE_LIMIT_ENABLED', True)
+    # Per-client limits for the code/OTP/identity endpoints (Flask-Limiter syntax).
+    RATE_LIMIT_OTP = _env_text('RATE_LIMIT_OTP', '5 per minute;20 per hour')
+    RATE_LIMIT_VERIFY = _env_text('RATE_LIMIT_VERIFY', '10 per minute;60 per hour')
+    RATE_LIMIT_IDENTITY = _env_text('RATE_LIMIT_IDENTITY', '60 per minute')
+    TRUSTED_PROXY_COUNT = max(1, int(os.environ.get('TRUSTED_PROXY_COUNT', 1)))
+    RATELIMIT_HEADERS_ENABLED = True
     RATE_LIMIT_REQUESTS = int(os.environ.get('RATE_LIMIT_REQUESTS', 20))
     RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get('RATE_LIMIT_WINDOW_SECONDS', 60))
     STRICT_QREADER_IMPORT = _env_bool('STRICT_QREADER_IMPORT', False)

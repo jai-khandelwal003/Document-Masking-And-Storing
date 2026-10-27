@@ -70,7 +70,10 @@ S3_SECRET_ACCESS_KEY=...
 - **Masked output access.** `/output/<file>` is served only to the session that created it. Anyone else must use the
   fragment + one-time-code flow (`/output/secure`). Lose the session and you need the code flow.
 - **Login required everywhere** except `/login` and `GET /health` (liveness only); `/health/details` needs login plus a token.
-- **Rate limiting** is per process and uses `X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true` (set for the bundled nginx).
+- **Rate limiting** is per process. Logins, code/OTP requests (`RATE_LIMIT_OTP`), code/PIN verification (`RATE_LIMIT_VERIFY`) and the
+  identity endpoints (`RATE_LIMIT_IDENTITY`) are limited per client address, and masking uploads are limited by
+  `RATE_LIMIT_REQUESTS`. `X-Forwarded-For` is used only when `TRUST_PROXY_HEADERS=true` and is read from the right
+  (`TRUSTED_PROXY_COUNT` proxies), because entries on the left can be forged by the client.
 - **OCR accuracy** is modest on noisy images; see `evaluation/RESULTS.md` for measured numbers (synthetic data only).
 - **Tests are isolated** from your real `output/` folder (they run against a temp directory), so running them is safe.
 - **PDFs:** every page is rendered, OCR'd and masked. A multi-page PDF returns a rebuilt masked PDF (image-only, so the

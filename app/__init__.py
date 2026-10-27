@@ -107,6 +107,7 @@ def _resolve_output_dir(app: Flask) -> str:
 
 def _register_blueprints(app: Flask) -> None:
     auth.init_limiter(app)
+    app.register_error_handler(429, auth.rate_limit_handler)
     app.register_blueprint(auth.bp)
     app.register_blueprint(health.bp)
     app.register_blueprint(mask.bp)

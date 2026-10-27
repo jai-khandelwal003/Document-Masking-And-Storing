@@ -7,14 +7,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app.models import auth_store
 from app.services import clerk_service
 
+from app.utils.client_ip import client_ip
+
 try:
     from flask_limiter import Limiter
-    from flask_limiter.util import get_remote_address
 except ModuleNotFoundError:  # pragma: no cover - optional dependency for local/demo runs
     Limiter = None
-
-    def get_remote_address():
-        return request.remote_addr or "unknown"
 
 bp = Blueprint("auth", __name__)
 
@@ -29,8 +27,28 @@ class _NullLimiter:
 
         return _decorator
 
+    def request_filter(self, func):
+        return func
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[]) if Limiter is not None else _NullLimiter()
+    def reset(self):
+        return None
+
+
+limiter = Limiter(key_func=client_ip, default_limits=[]) if Limiter is not None else _NullLimiter()
+
+
+@limiter.request_filter
+def _skip_rate_limits():
+    cfg = current_app.config
+    if not cfg.get("RATE_LIMIT_ENABLED", True):
+        return True
+    # Unit tests hammer endpoints on purpose; RATE_LIMIT_FORCE lets the rate-limit tests opt back in.
+    return bool(cfg.get("TESTING")) and not cfg.get("RATE_LIMIT_FORCE", False)
+
+
+def config_limit(config_key, fallback="60 per minute"):
+    """Rate-limit decorator whose limit string is read from app config on every request."""
+    return limiter.limit(lambda: str(current_app.config.get(config_key) or fallback))
 
 _PUBLIC_ENDPOINTS = {
     "auth.login",
@@ -192,9 +210,11 @@ def change_password():
     return jsonify({"message": "Password changed successfully"}), 200
 
 
-@bp.errorhandler(429)
 def rate_limit_handler(error):
-    retry_after = int(getattr(error, "retry_after", 0) or 0)
+    try:
+        retry_after = int(error.limit.limit.get_expiry())
+    except Exception:
+        retry_after = int(getattr(error, "retry_after", 0) or 0)
     if request.path == "/login":
         configured_user = str(current_app.config.get("USER_ID", "admin") or "admin").strip()
         configured_password = _configured_password()

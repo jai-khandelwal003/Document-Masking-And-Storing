@@ -23,13 +23,13 @@ Builds the image, reads `.env`, publishes `3000:3000`, mounts `./output` to `/ap
 
 ## Other tooling
 - `Makefile`: `install`, `run`, `test`, `lint`, `clean`, `docker`.
-- `.github/workflows/ci.yml`: Python 3.12, installs requirements, runs `python -m unittest discover -s tests` on push/PR.
+- `.github/workflows/ci.yml` (push and pull request): job **Secret scan** (`tools/scan_secrets.py --all`) and job **Unit tests** on ubuntu with `tesseract-ocr`, `libmagic1`, `libgl1`, `libglib2.0-0`, `libzbar0` installed, pip cache, and `requirements.txt` minus the optional QR/ML stack (torch, torchvision, ultralytics, qreader, qrdet, quadrilateral-fitter), then `python -m unittest discover -s tests`. Read-only token, 20 min timeout, superseded runs cancelled.
 
 ## Edge cases
 - Tesseract path on Windows defaults to `C:\Program Files\Tesseract-OCR\tesseract.exe`; in Docker it's on `PATH`.
 - Do not raise the worker count without moving the in-memory access/OTP/vault state into the database.
 - `docker-compose.production.yml` sets `TRUST_PROXY_HEADERS=true` because nginx sets `X-Forwarded-For`.
-- The CI installs the full requirements; heavy packages (e.g. qreader/torch) slow the build.
+- CI skips the optional QR/ML packages; the Docker image installs everything in `requirements.txt`, so QR masking works there.
 
 ## Acceptance criteria
 - `docker compose up --build` serves `/health` on port 3000.

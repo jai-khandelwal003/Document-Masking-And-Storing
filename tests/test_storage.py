@@ -17,7 +17,7 @@ from app.services.access_service import _reset_access_state_for_tests, register_
 from app.services.storage import S3Storage, StorageError, init_storage
 from app.services.storage_cleanup import cleanup_storage
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+from tests._samples import PNG_BYTES  # noqa: E402
 PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"
 
 

@@ -18,6 +18,7 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_scan_secrets.py` | secret scanner: token patterns, placeholders, blocked files |
 | `test_pdf_pages.py` | multi-page PDFs: every page masked, image-only output PDF (no text layer), limits, encryption, secure/owner access, remote storage |
 | `test_aadhaar_masker.py` | masker with mocked OCR: numbers found by different passes, dedupe, overlap |
+| `test_rate_limits.py` | code/OTP/identity/login limits, 429 JSON, per-endpoint buckets, client-address rules, forged `X-Forwarded-For` |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.
@@ -31,7 +32,7 @@ Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted ac
 - Measured results and their caveats are in `evaluation/RESULTS.md`. Real identity documents must never be added.
 
 ## CI
-`.github/workflows/ci.yml` runs the unit tests on every push and pull request.
+`.github/workflows/ci.yml` runs the secret scan and the unit tests on every push and pull request (see spec 12). Tests use genuine sample files (`tests/_samples.py`) so file-type sniffing behaves the same with libmagic on Linux.
 
 ## Edge cases
 - OCR-dependent tests need Tesseract installed (or mocks).

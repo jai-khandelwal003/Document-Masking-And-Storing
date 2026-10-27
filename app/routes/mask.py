@@ -5,6 +5,7 @@ from app.utils.file_utils import allowed_file
 from app.utils.mime_utils import detect_mime_from_stream, is_allowed_upload_mime
 from app.models.audit_store import log_mask_job
 from app.services.storage import StorageError
+from app.utils.client_ip import client_ip
 
 bp = Blueprint("mask", __name__)
 _RATE_LIMIT_STATE = {}
@@ -12,12 +13,7 @@ _RATE_LIMIT_LOCK = threading.Lock()
 
 def _to_bool(v, d=False): return str(v or "").strip().lower() in {"1", "true", "yes", "on"} if v else d
 def _client_ip():
-    # X-Forwarded-For is client-controlled unless a trusted proxy (e.g. the bundled nginx) sets it.
-    if current_app.config.get("TRUST_PROXY_HEADERS", False):
-        ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        if ip:
-            return ip
-    return request.remote_addr or "unknown"
+    return client_ip()
 
 def _remember_output(result):
     # Only the session that created a masked file may fetch it from /output/<file>;

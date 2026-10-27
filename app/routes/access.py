@@ -19,6 +19,7 @@ from app.services.access_service import (
 )
 from app.models.identity_store import add_document, get_documents, remove_document, upsert_profile
 from app.models.audit_store import get_recent_entries
+from app.routes.auth import config_limit
 from app.services.storage import StorageError, identity_docs_root, remote_storage
 from app.utils.mime_utils import detect_mime_from_stream, is_allowed_upload_mime
 
@@ -33,6 +34,7 @@ def _valid_profile_key(profile_key):
 
 
 @bp.route("/access/request-code", methods=["POST"])
+@config_limit("RATE_LIMIT_OTP")
 def request_access_code_route():
     payload = request.get_json(silent=True) or {}
     ok, body, status = issue_access_code(
@@ -45,6 +47,7 @@ def request_access_code_route():
 
 
 @bp.route("/access/verify", methods=["POST"])
+@config_limit("RATE_LIMIT_VERIFY")
 def verify_access_route():
     payload = request.get_json(silent=True) or {}
     ok, body, status = verify_access_code(
@@ -58,6 +61,7 @@ def verify_access_route():
 
 
 @bp.route("/identity/link-documents", methods=["POST"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def link_identity_documents_route():
     payload = request.get_json(silent=True) or {}
     profile_key = str(payload.get("profileKey", "") or "").strip()
@@ -85,6 +89,7 @@ def link_identity_documents_route():
 
 
 @bp.route("/identity/unlink-document", methods=["POST"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def unlink_identity_document_route():
     payload = request.get_json(silent=True) or {}
     profile_key = str(payload.get("profileKey", "") or "").strip()
@@ -110,6 +115,7 @@ def unlink_identity_document_route():
 
 
 @bp.route("/identity/upload-document", methods=["POST"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def upload_identity_document_route():
     file_obj = request.files.get("file")
     profile_key = str(request.form.get("profileKey", "") or "").strip()
@@ -172,6 +178,7 @@ def upload_identity_document_route():
 
 
 @bp.route("/identity/register-documents", methods=["POST"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def register_person_documents_route():
     payload = request.get_json(silent=True) or {}
     ok, body, status = register_person_documents(
@@ -182,6 +189,7 @@ def register_person_documents_route():
 
 
 @bp.route("/identity/unlock", methods=["POST"])
+@config_limit("RATE_LIMIT_VERIFY")
 def unlock_identity_route():
     payload = request.get_json(silent=True) or {}
     ok, body, status = unlock_identity_documents(
@@ -193,6 +201,7 @@ def unlock_identity_route():
 
 
 @bp.route("/identity/request-otp", methods=["POST"])
+@config_limit("RATE_LIMIT_OTP")
 def request_identity_otp_route():
     payload = request.get_json(silent=True) or {}
     ok, body, status = issue_identity_otp(
@@ -203,6 +212,7 @@ def request_identity_otp_route():
 
 
 @bp.route("/identity/documents", methods=["GET"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def identity_documents_route():
     profile_key = request.args.get("profileKey", "")
     if profile_key:
@@ -222,6 +232,7 @@ def identity_documents_route():
 
 
 @bp.route("/analytics/audit-log", methods=["GET"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def audit_log_route():
     try:
         limit = int(request.args.get("limit", 20) or 20)
@@ -231,6 +242,7 @@ def audit_log_route():
 
 
 @bp.route("/identity/document-file", methods=["GET"])
+@config_limit("RATE_LIMIT_IDENTITY")
 def identity_document_file_route():
     # Support two access modes:
     # 1) token + file - secure token-based access (existing behavior)

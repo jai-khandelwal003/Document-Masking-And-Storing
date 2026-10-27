@@ -7,7 +7,7 @@ from app import create_app
 from app.routes import mask as mask_route
 from app.services.mask_service import MaskResponse
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+from tests._samples import PNG_BYTES  # noqa: E402
 
 
 class MaskSecurityTestCase(unittest.TestCase):

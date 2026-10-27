@@ -22,7 +22,14 @@ Protect the UI and the masking API with three layers: session login (local or Cl
 
 **API key** (`mask.py::_check_auth`): when `API_KEY_REQUIRED=true`, `/mask/document` requires header `X-API-Key` matching `API_KEY` (constant-time compare).
 
-**Mask rate limit** (`mask.py::_check_rate_limit`): in-memory sliding window per client IP (`X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true`, else the socket address); defaults 20 requests / 60 s; returns 429 with `retryAfterSec`. State is per-process.
+**Code / OTP / identity limits** (Flask-Limiter, `app/routes/auth.py::config_limit`, strings read from config on every request):
+- `RATE_LIMIT_OTP` (default `5 per minute;20 per hour`): `POST /access/request-code`, `POST /identity/request-otp`
+- `RATE_LIMIT_VERIFY` (`10 per minute;60 per hour`): `POST /access/verify`, `POST /identity/unlock`
+- `RATE_LIMIT_IDENTITY` (`60 per minute`): the other `/identity/*` routes and `/analytics/audit-log`
+- Each endpoint has its own bucket per client address. Exceeding it returns `429 {"error": "Too many requests", "retryAfterSec": n}` (HTML login page for `/login`). `RATE_LIMIT_ENABLED=false` switches all of them off; unit tests skip them unless `RATE_LIMIT_FORCE` is set.
+- Client address (`app/utils/client_ip.py`): the socket address, or with `TRUST_PROXY_HEADERS=true` the `X-Forwarded-For` entry added by the last trusted proxy, counted from the right (`TRUSTED_PROXY_COUNT`). Entries on the left are client-controlled and ignored.
+
+**Mask rate limit** (`mask.py::_check_rate_limit`): in-memory sliding window per client IP (same client-address rule as above); defaults 20 requests / 60 s; returns 429 with `retryAfterSec`. State is per-process.
 
 ## Edge cases
 - Local default credentials are `admin` / `admin123` for development only; production refuses to start with them (or a password under 10 chars).
