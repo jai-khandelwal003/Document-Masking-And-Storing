@@ -31,6 +31,8 @@ PyMuPDF==1.24.14
 py-cpuinfo==9.0.0
 pyparsing==3.2.0
 pytesseract==0.3.13
+PyJWT==2.9.0
+cryptography>=43.0.3
 python-dateutil==2.9.0.post0
 pytz==2024.2
 PyYAML==6.0.2

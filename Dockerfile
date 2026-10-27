@@ -13,4 +13,4 @@ COPY resources resources
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 3000
-CMD ["gunicorn", "-w", "5", "-t", "5", "-b", "0.0.0.0:3000", "main:app", "--timeout", "120"]
+CMD ["gunicorn", "-w", "1", "--threads", "8", "-b", "0.0.0.0:3000", "main:app", "--timeout", "120"]

@@ -12,6 +12,7 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_mask_security.py` | API key, rate limit, integrity token, MIME checks |
 | `test_access_control.py` | access codes, OTP, tokens, identity unlock/view |
 | `test_identity_vault_fullmask.py` | vault behavior when everything is masked |
+| `test_auth_clerk.py` | Clerk login page and session exchange, JWT verification (signature/expiry/issuer/azp), allow-list, local password persistence, output ownership, proxy trust, production guardrails |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.
@@ -19,7 +20,8 @@ Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted ac
 ## Accuracy evaluation (`tools/evaluate_metrics.py`)
 - Input: a CSV like `evaluation/labels_template.csv` with columns `filename,document_type,expected_detected`.
 - It posts each sample to a running service with `requests` and compares the `aadhaarDetected` / `panDetected` / `drivingLicenceDetected` flag per type to the label, then reports metrics per document type.
-- Sample images are not committed; use synthetic or consented samples only.
+- `python tools/generate_synthetic_samples.py` creates 42 synthetic images (no real data) and `evaluation/labels_synthetic.csv`; run the evaluation with `--in-process` (no server or login needed), or against a running service with `--cookie` / `--api-key`.
+- Measured results and their caveats are in `evaluation/RESULTS.md`. Real identity documents must never be added.
 
 ## CI
 `.github/workflows/ci.yml` runs the unit tests on every push and pull request.

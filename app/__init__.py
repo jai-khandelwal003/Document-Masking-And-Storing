@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 try:
     from flasgger import Swagger
@@ -35,6 +35,18 @@ def _apply_runtime_guardrails(app):
         raise RuntimeError("Production requires SECRET_KEY environment variable")
     if not os.environ.get("HASH_SECRET", "").strip():
         raise RuntimeError("Production requires HASH_SECRET environment variable")
+
+    auth_provider = str(app.config.get("AUTH_PROVIDER", "local")).strip().lower()
+    if auth_provider == "clerk":
+        if not str(app.config.get("CLERK_PUBLISHABLE_KEY", "") or "").strip() or not str(app.config.get("CLERK_SECRET_KEY", "") or "").strip():
+            raise RuntimeError("Production with AUTH_PROVIDER=clerk requires CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY")
+        has_allowlist = str(app.config.get("CLERK_ALLOWED_EMAILS", "") or "").strip() or str(app.config.get("CLERK_ALLOWED_DOMAINS", "") or "").strip()
+        if not has_allowlist and not _is_truthy(app.config.get("CLERK_ALLOW_ANY_USER", False)):
+            raise RuntimeError("Production requires CLERK_ALLOWED_EMAILS or CLERK_ALLOWED_DOMAINS (or CLERK_ALLOW_ANY_USER=true)")
+    else:
+        password = str(app.config.get("USER_PASSWORD", "") or "")
+        if password in {"", "admin123", "change-me"} or len(password) < 10:
+            raise RuntimeError("Production requires USER_PASSWORD to be set to a strong value (10+ chars, not the default)")
 
     api_key_required = _is_truthy(app.config.get("API_KEY_REQUIRED", True))
     if api_key_required and not str(app.config.get("API_KEY", "") or "").strip():
@@ -143,6 +155,8 @@ def create_app():
 
     @app.route("/output/<path:filename>")
     def output_file(filename):
+        if filename not in session.get("owned_outputs", []):
+            return jsonify({"error": "Not your file. Use /output/secure with an access token."}), 403
         return send_from_directory(_resolve_output_dir(app), filename)
 
     @app.route("/output/secure", methods=["GET"])

@@ -2,6 +2,36 @@
 
 Smart Aadhaar document masking service with OCR-based detection and a presentation-ready web UI.
 
+> **Disclaimer:** this is a learning/portfolio project. OCR-based masking can miss numbers, so a person must check
+> every output. It is not certified for, and makes no claim of compliance with, any law or regulation (including
+> India's DPDP Act or Aadhaar Act rules). Do not use it on real identity documents without your own legal and security review.
+
+## Authentication
+
+Two login modes, selected by `AUTH_PROVIDER` (`local` or `clerk`; auto-selects `clerk` when both Clerk keys are set).
+
+**Clerk (hosted login)**
+1. Create an application at https://dashboard.clerk.com and copy the publishable and secret keys.
+2. Set `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` and who may sign in: `CLERK_ALLOWED_EMAILS` and/or `CLERK_ALLOWED_DOMAINS`.
+   Anyone can sign up on a Clerk instance, so without an allow-list every sign-in is rejected (set `CLERK_ALLOW_ANY_USER=true` only for demos).
+3. Start the app and open `/login`. The page loads Clerk's sign-in widget; after sign-in the browser sends Clerk's session
+   token to `POST /auth/clerk/session`, where the server verifies the signature (JWKS), expiry, issuer and optional `azp`,
+   checks the allow-list against the user's *verified* email, and only then starts a Flask session.
+
+**Local**: `USER_ID` / `USER_PASSWORD`. A password changed in the UI is stored as a hash in `output/access_state.sqlite3`.
+Production refuses to start with the default or a short password.
+
+## Known limitations
+
+- **Single worker by design.** Access codes, OTPs and the identity vault are kept in process memory (snapshotted to SQLite),
+  so the container runs `gunicorn -w 1 --threads 8`. Do not add workers without moving that state fully into a database.
+- **Masked output access.** `/output/<file>` is served only to the session that created it. Anyone else must use the
+  fragment + one-time-code flow (`/output/secure`). Lose the session and you need the code flow.
+- **Login required everywhere**, including `/health`; whitelist it at the proxy for uptime checks (`/health/details` needs a token).
+- **Rate limiting** is per process and uses `X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true` (set for the bundled nginx).
+- **OCR accuracy** is modest on noisy images; see `evaluation/RESULTS.md` for measured numbers (synthetic data only).
+- PDFs: only the first page is processed. Original uploads are deleted after processing unless `PERSIST_ORIGINAL_UPLOADS=true`.
+
 ## Panel Demo Guide
 
 ### 1. Prerequisites

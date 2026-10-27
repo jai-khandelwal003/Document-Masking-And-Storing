@@ -1,4 +1,4 @@
-import threading, time, hmac
+import os, threading, time, hmac
 from flask import Blueprint, current_app, request, jsonify, session
 from app.services.mask_service import upload_aadhaar_and_mask, upload_document_and_mask, verify_integrity_token
 from app.utils.file_utils import allowed_file
@@ -10,9 +10,23 @@ _RATE_LIMIT_STATE = {}
 _RATE_LIMIT_LOCK = threading.Lock()
 
 def _to_bool(v, d=False): return str(v or "").strip().lower() in {"1", "true", "yes", "on"} if v else d
-def _client_ip(): 
-    ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    return ip or request.remote_addr or "unknown"
+def _client_ip():
+    # X-Forwarded-For is client-controlled unless a trusted proxy (e.g. the bundled nginx) sets it.
+    if current_app.config.get("TRUST_PROXY_HEADERS", False):
+        ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        if ip:
+            return ip
+    return request.remote_addr or "unknown"
+
+def _remember_output(result):
+    # Only the session that created a masked file may fetch it from /output/<file>;
+    # everyone else must go through the OTP-protected /output/secure flow.
+    name = os.path.basename(str(result.get("outputImageUrl", "") or ""))
+    if not name:
+        return
+    owned = [n for n in session.get("owned_outputs", []) if n != name]
+    owned.append(name)
+    session["owned_outputs"] = owned[-50:]
 def _param(name, default="", sources=None):
     sources = sources or [request.form, request.args, request.headers]
     headers = {"document_type": "X-Document-Type", "first8_mask": "X-First8-Mask", "last4_mask": "X-Last4-Mask", "mask_qr": "X-Mask-QR"}
@@ -76,6 +90,7 @@ def mask_aadhaar_route():
     
     resp = (upload_aadhaar_and_mask if dt == "aadhaar" else upload_document_and_mask)(file, f8, l4, mq, document_type=dt)
     result = resp.to_dict()
+    _remember_output(result)
     mode = "both" if f8 and l4 else ("first8" if f8 else "last4")
     log_mask_job(str(session.get("auth_user", "authenticated-user")), str(result.get("documentType", dt)), 
                  str(result.get("jobId", "")), mode, int(result.get("noOfAadhaarDetected", 0) or 0) + int(result.get("noOfQrDetected", 0) or 0))

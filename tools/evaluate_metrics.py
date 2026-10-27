@@ -2,6 +2,8 @@ import argparse
 import csv
 import json
 import os
+import sys
+import time
 from collections import defaultdict
 
 import requests
@@ -38,7 +40,51 @@ def _f1(precision, recall):
     return 2 * precision * recall / (precision + recall)
 
 
-def evaluate(base_url, images_dir, labels_csv, timeout_sec, out_json_path="", out_csv_path=""):
+def _make_poster(base_url, timeout_sec, in_process, cookie="", api_key=""):
+    """Return post_mask(filename, fileobj, data) -> (status, json, latency_ms, body_text)."""
+    if in_process:
+        from app import create_app
+
+        app = create_app()
+        app.config.update(TESTING=True, RATE_LIMIT_ENABLED=False, API_KEY_REQUIRED=False)
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess["auth_user"] = "evaluator"
+
+        def post_in_process(filename, fileobj, data):
+            started = time.time()
+            resp = client.post(
+                "/mask/document",
+                data={**data, "file": (fileobj, filename)},
+                content_type="multipart/form-data",
+            )
+            latency = int((time.time() - started) * 1000)
+            return resp.status_code, resp.get_json(silent=True) or {}, latency, resp.get_data(as_text=True)
+
+        return post_in_process
+
+    headers = {}
+    if cookie:
+        headers["Cookie"] = cookie
+    if api_key:
+        headers["X-API-Key"] = api_key
+
+    def post_remote(filename, fileobj, data):
+        resp = requests.post(
+            f"{base_url.rstrip('/')}/mask/document",
+            files={"file": (filename, fileobj, "image/png")},
+            data=data,
+            headers=headers,
+            timeout=timeout_sec,
+        )
+        payload = resp.json() if resp.ok else {}
+        return resp.status_code, payload, int(resp.elapsed.total_seconds() * 1000), resp.text
+
+    return post_remote
+
+
+def evaluate(base_url, images_dir, labels_csv, timeout_sec, out_json_path="", out_csv_path="", in_process=False, cookie="", api_key=""):
+    post_mask = _make_poster(base_url, timeout_sec, in_process, cookie, api_key)
     rows = []
     with open(labels_csv, "r", encoding="utf-8", newline="") as file_obj:
         reader = csv.DictReader(file_obj)
@@ -61,31 +107,22 @@ def evaluate(base_url, images_dir, labels_csv, timeout_sec, out_json_path="", ou
             print(f"Missing image: {image_path}")
             continue
 
+        data = {
+            "document_type": document_type,
+            "first8_mask": "true",
+            "last4_mask": "false",
+            "mask_qr": "false",
+        }
         with open(image_path, "rb") as image_file:
-            files = {"file": (filename, image_file, "image/jpeg")}
-            data = {
-                "document_type": document_type,
-                "first8_mask": "true",
-                "last4_mask": "false",
-                "mask_qr": "false",
-            }
             try:
-                resp = requests.post(
-                    f"{base_url.rstrip('/')}/mask/document",
-                    files=files,
-                    data=data,
-                    timeout=timeout_sec,
-                )
+                status_code, payload, latency_ms, body = post_mask(filename, image_file, data)
             except requests.RequestException as exc:
                 print(f"Request failed for {filename}: {exc}")
                 continue
 
-        latency_ms = int(resp.elapsed.total_seconds() * 1000)
-        if not resp.ok:
-            print(f"Non-200 for {filename}: {resp.status_code} {resp.text[:160]}")
+        if status_code != 200:
+            print(f"Non-200 for {filename}: {status_code} {body[:160]}")
             continue
-
-        payload = resp.json()
         predicted = _detected_for_type(payload, document_type)
 
         bucket = stats[document_type]
@@ -179,9 +216,18 @@ def main():
     parser.add_argument("--timeout", type=int, default=30, help="Request timeout in seconds")
     parser.add_argument("--out-json", default="", help="Optional JSON summary output path")
     parser.add_argument("--out-csv", default="", help="Optional CSV summary output path")
+    parser.add_argument("--in-process", action="store_true", help="Run the app in this process (no server or login needed)")
+    parser.add_argument("--cookie", default="", help="Session cookie header value for a running, login-protected service")
+    parser.add_argument("--api-key", default="", help="X-API-Key value when API_KEY_REQUIRED=true")
     args = parser.parse_args()
 
-    evaluate(args.base_url, args.images_dir, args.labels_csv, args.timeout, args.out_json, args.out_csv)
+    if args.in_process:
+        sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+    evaluate(
+        args.base_url, args.images_dir, args.labels_csv, args.timeout, args.out_json, args.out_csv,
+        in_process=args.in_process, cookie=args.cookie, api_key=args.api_key,
+    )
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+import os
+
 from app.utils.validate_addhar import is_valid_aadhaar
 
 
@@ -19,6 +21,12 @@ def _digits_only(value: str) -> str:
     }
     normalized = "".join(translation.get(ch, ch) for ch in str(value))
     return "".join(ch for ch in normalized if ch.isdigit())
+
+
+def _allow_unchecked() -> bool:
+    # Recall-first default: also mask 12-digit numbers that fail the checksum (OCR noise).
+    # Set AADHAAR_ALLOW_UNCHECKED=false to mask only checksum-valid numbers (fewer false positives).
+    return str(os.environ.get("AADHAAR_ALLOW_UNCHECKED", "true")).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _is_probable_aadhaar(value: str) -> bool:
@@ -49,7 +57,7 @@ def detect_aadhaar_number(data) -> list:
         if is_valid_aadhaar(joined):
             strict_hits.append([i, i + 1, i + 2])
 
-    if strict_hits:
+    if strict_hits or not _allow_unchecked():
         return strict_hits
 
     # Fallback: probable Aadhaar pattern when strict checksum misses due to OCR quality.

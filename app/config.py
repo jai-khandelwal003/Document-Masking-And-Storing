@@ -19,6 +19,15 @@ def _is_production_env() -> bool:
     app_env = _env_text("APP_ENV", _env_text("FLASK_ENV", "development")).lower()
     return app_env in {"prod", "production"} or _env_bool("PRODUCTION", False)
 
+def _default_auth_provider() -> str:
+    explicit = _env_text('AUTH_PROVIDER', '').lower()
+    if explicit in {'local', 'clerk'}:
+        return explicit
+    if _env_text('CLERK_PUBLISHABLE_KEY') and _env_text('CLERK_SECRET_KEY'):
+        return 'clerk'
+    return 'local'
+
+
 class Config:
     APP_ENV = _env_text('APP_ENV', _env_text('FLASK_ENV', 'development')).lower()
     PRODUCTION = _is_production_env()
@@ -40,6 +49,15 @@ class Config:
     USER_ID = _env_text('USER_ID', 'admin')
     USER_PASSWORD = _env_text('USER_PASSWORD', 'admin123')
     SHOW_LOGIN_CREDENTIAL_HINTS = _env_bool('SHOW_LOGIN_CREDENTIAL_HINTS', False)
+    AUTH_PROVIDER = _default_auth_provider()
+    CLERK_PUBLISHABLE_KEY = _env_text('CLERK_PUBLISHABLE_KEY')
+    CLERK_SECRET_KEY = _env_text('CLERK_SECRET_KEY')
+    CLERK_JWKS_URL = _env_text('CLERK_JWKS_URL')
+    CLERK_AUTHORIZED_PARTIES = _env_text('CLERK_AUTHORIZED_PARTIES')
+    CLERK_ALLOWED_EMAILS = _env_text('CLERK_ALLOWED_EMAILS')
+    CLERK_ALLOWED_DOMAINS = _env_text('CLERK_ALLOWED_DOMAINS')
+    CLERK_ALLOW_ANY_USER = _env_bool('CLERK_ALLOW_ANY_USER', False)
+    TRUST_PROXY_HEADERS = _env_bool('TRUST_PROXY_HEADERS', False)
     RATE_LIMIT_ENABLED = _env_bool('RATE_LIMIT_ENABLED', True)
     RATE_LIMIT_REQUESTS = int(os.environ.get('RATE_LIMIT_REQUESTS', 20))
     RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get('RATE_LIMIT_WINDOW_SECONDS', 60))

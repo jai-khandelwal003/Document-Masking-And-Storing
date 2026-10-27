@@ -25,6 +25,21 @@ def _norm_token(value: str) -> str:
     return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
 
 
+_TO_LETTER = str.maketrans({"0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "8": "B"})
+_TO_DIGIT = str.maketrans({"O": "0", "Q": "0", "D": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "G": "6", "B": "8"})
+
+
+def _correct_pan(candidate: str) -> str:
+    """Fix common OCR letter/digit confusions using the fixed PAN layout (5 letters, 4 digits, 1 letter)."""
+    if len(candidate) != 10:
+        return candidate
+    return (
+        candidate[:5].translate(_TO_LETTER)
+        + candidate[5:9].translate(_TO_DIGIT)
+        + candidate[9:].translate(_TO_LETTER)
+    )
+
+
 def _match_pan(candidate: str) -> str:
     if PAN_REGEX.fullmatch(candidate):
         return "pan-standard"
@@ -173,7 +188,8 @@ def mask_pan_and_driving_licence(
                     continue
                 candidate = "".join(parts)
 
-                pan_match = _match_pan(candidate) if mask_pan else ""
+                pan_candidate = _correct_pan(candidate) if mask_pan else candidate
+                pan_match = _match_pan(pan_candidate) if mask_pan else ""
                 dl_match = _match_dl(candidate) if mask_driving_licence else ""
                 matched_pan = bool(pan_match)
                 matched_dl = bool(dl_match)
@@ -221,7 +237,7 @@ def mask_pan_and_driving_licence(
 
                 if matched_pan:
                     pan_count += 1
-                    pan_value = pan_value or candidate
+                    pan_value = pan_value or pan_candidate
                     pan_pattern = pan_pattern or pan_match
                     found_in_pass = True
                 if matched_dl:

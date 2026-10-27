@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "documentType": "aadhaar",
+      "precision": 0.7273,
+      "recall": 0.8,
+      "f1": 0.7619,
+      "avgTimeMs": 1166,
+      "samples": 16
+    },
+    {
+      "documentType": "pan",
+      "precision": 1.0,
+      "recall": 0.4,
+      "f1": 0.5714,
+      "avgTimeMs": 843,
+      "samples": 13
+    },
+    {
+      "documentType": "dl",
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "avgTimeMs": 650,
+      "samples": 13
+    },
+    {
+      "documentType": "all",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "avgTimeMs": 0,
+      "samples": 0
+    },
+    {
+      "documentType": "overall",
+      "precision": 0.88,
+      "recall": 0.7333,
+      "f1": 0.8,
+      "avgTimeMs": 907,
+      "samples": 42
+    }
+  ]
+}

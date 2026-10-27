@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>(function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('sdmTheme') || 'dark'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();</script>
+  <title>{{ 'Signing out' if logout else 'Sign in' }} | {{ branding.projectTitle }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    html[data-theme="dark"] { --bg: #0d1b2a; --surface: rgba(36, 59, 83, 0.54); --line: rgba(255, 255, 255, 0.14); --text: #e8f4f0; --muted: #8ab3a8; --danger: #e24b4a; }
+    html[data-theme="light"], html[data-theme="auto"] { --bg: #f2f7ff; --surface: rgba(255, 255, 255, 0.84); --line: rgba(31, 64, 98, 0.2); --text: #1a3047; --muted: #4f718f; --danger: #c13d3d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text); font-family: "DM Sans", "Segoe UI", sans-serif; padding: 24px; }
+    .card { width: min(440px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 28px 24px; text-align: center; backdrop-filter: blur(10px); }
+    h1 { margin: 0 0 6px; font-size: 1.35rem; }
+    p.sub { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; }
+    #clerk-root { display: flex; justify-content: center; min-height: 48px; }
+    .msg { margin-top: 16px; font-size: 0.92rem; color: var(--muted); }
+    .msg.error { color: var(--danger); }
+    noscript { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>{{ branding.projectTitle }}</h1>
+    <p class="sub">{{ 'Signing you out...' if logout else 'Sign in to continue' }}</p>
+    <div id="clerk-root"></div>
+    <p id="status" class="msg" role="status" aria-live="polite">
+      {% if not configured %}Clerk is not configured. Set CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY, or use AUTH_PROVIDER=local.{% else %}Loading...{% endif %}
+    </p>
+    <noscript><p>JavaScript is required to sign in.</p></noscript>
+  </main>
+
+  {% if configured %}
+  <script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="{{ publishable_key }}"
+    src="https://{{ frontend_host }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    id="clerk-script"></script>
+  <script>
+    (function () {
+      var LOGOUT = {{ 'true' if logout else 'false' }};
+      var NEXT_URL = {{ next_url | tojson }};
+      var statusEl = document.getElementById('status');
+      var exchanging = false;
+
+      function setStatus(text, isError) {
+        statusEl.textContent = text;
+        statusEl.className = 'msg' + (isError ? ' error' : '');
+      }
+
+      async function exchange() {
+        if (exchanging) return;
+        exchanging = true;
+        setStatus('Verifying your session...');
+        try {
+          var token = await window.Clerk.session.getToken();
+          var resp = await fetch('/auth/clerk/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, next: NEXT_URL }),
+          });
+          var data = await resp.json().catch(function () { return {}; });
+          if (resp.ok) {
+            window.location.replace(data.redirect || '/dashboard');
+            return;
+          }
+          setStatus(data.error || 'Sign-in was rejected.', true);
+          await window.Clerk.signOut();
+          window.location.replace('/login?denied=1');
+        } catch (err) {
+          setStatus('Could not complete sign-in. Please try again.', true);
+          exchanging = false;
+        }
+      }
+
+      async function start() {
+        try {
+          await window.Clerk.load();
+        } catch (err) {
+          setStatus('Could not load the sign-in service.', true);
+          return;
+        }
+
+        if (LOGOUT) {
+          try { await window.Clerk.signOut(); } catch (err) {}
+          window.location.replace('/login');
+          return;
+        }
+
+        if (window.Clerk.session) {
+          exchange();
+          return;
+        }
+
+        setStatus(new URLSearchParams(window.location.search).has('denied') ? 'That account is not allowed to use this service.' : '');
+        statusEl.className = new URLSearchParams(window.location.search).has('denied') ? 'msg error' : 'msg';
+        window.Clerk.mountSignIn(document.getElementById('clerk-root'), {
+          forceRedirectUrl: window.location.href,
+          signUpUrl: undefined,
+        });
+        window.Clerk.addListener(function (state) {
+          if (state.session) exchange();
+        });
+      }
+
+      var script = document.getElementById('clerk-script');
+      if (window.Clerk) start(); else script.addEventListener('load', start);
+      script.addEventListener('error', function () { setStatus('Could not load the sign-in service.', true); });
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

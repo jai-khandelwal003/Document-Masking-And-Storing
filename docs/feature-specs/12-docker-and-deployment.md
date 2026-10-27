@@ -6,7 +6,7 @@ Run the service reproducibly locally and in production behind TLS.
 ## Image (`Dockerfile`)
 - `python:3.12-slim-bookworm` + `libgl1`, `libglib2.0-0`, `libzbar0`, `tesseract-ocr`.
 - Copies `app`, `main.py`, `resources` (Tesseract traineddata), `requirements.txt`.
-- Runs `gunicorn -w 5 -t 5 -b 0.0.0.0:3000 main:app --timeout 120`.
+- Runs `gunicorn -w 1 --threads 8 -b 0.0.0.0:3000 main:app --timeout 120`. One worker is required because access codes, OTPs and the vault live in process memory.
 
 ## Local (`docker-compose.yml`)
 Builds the image, reads `.env`, publishes `3000:3000`, mounts `./output` to `/app/output`.
@@ -27,7 +27,8 @@ Builds the image, reads `.env`, publishes `3000:3000`, mounts `./output` to `/ap
 
 ## Edge cases
 - Tesseract path on Windows defaults to `C:\Program Files\Tesseract-OCR\tesseract.exe`; in Docker it's on `PATH`.
-- With 5 workers, the in-memory rate limiter and login limiter are per worker.
+- Do not raise the worker count without moving the in-memory access/OTP/vault state into the database.
+- `docker-compose.production.yml` sets `TRUST_PROXY_HEADERS=true` because nginx sets `X-Forwarded-For`.
 - The CI installs the full requirements; heavy packages (e.g. qreader/torch) slow the build.
 
 ## Acceptance criteria
