@@ -119,7 +119,18 @@ def _storage_health(output_dir):
     except (TypeError, ValueError):
         retention_days = 30
 
+    remote = current_app.extensions.get("remote_storage")
     return {
+        "backend": "s3" if remote is not None else "local",
+        "remote": (
+            {
+                "bucket": remote.bucket,
+                "reachable": remote.ping(),
+                "encryption": remote.sse or "none",
+            }
+            if remote is not None
+            else None
+        ),
         "cleanupEnabled": bool(current_app.config.get("STORAGE_CLEANUP_ENABLED", False)),
         "cleanupAtStartup": bool(current_app.config.get("STORAGE_CLEANUP_AT_STARTUP", True)),
         "retentionDays": retention_days,

@@ -1,3 +1,4 @@
+from tests import _isolation  # noqa: F401  (must be first: isolates test data)
 import os
 import requests
 import csv

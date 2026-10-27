@@ -19,7 +19,8 @@ All behavior is controlled by environment variables, read once in `app/config.py
 | Access code | `ACCESS_CODE_TTL_SECONDS`, `ACCESS_TOKEN_TTL_SECONDS`, `ACCESS_MAX_ATTEMPTS`, `ACCESS_SHOW_CODE`, `ACCESS_FALLBACK_SECRET` |
 | Identity OTP | `IDENTITY_REQUIRE_OTP`, `IDENTITY_OTP_*`, `IDENTITY_SHOW_OTP`, `IDENTITY_OTP_PROVIDER` |
 | SMTP | `OTP_EMAIL_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TO`, `OTP_EMAIL_USE_TLS`, `OTP_EMAIL_SUBJECT_PREFIX` |
-| Storage | `PERSIST_ORIGINAL_UPLOADS`, `ORIGINAL_UPLOADS_DIR`, `STORAGE_*`, `IDENTITY_DB_PATH`, `AUDIT_LOG_PATH`, `ACCESS_STATE_*` |
+| Remote storage | `STORAGE_BACKEND` (`local`/`s3`), `S3_BUCKET`, `S3_PREFIX`, `S3_REGION`, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SSE`, `S3_FORCE_PATH_STYLE` |
+| Storage | `IDENTITY_DOCS_DIR`, `UPLOAD_FOLDER`, `PERSIST_ORIGINAL_UPLOADS`, `ORIGINAL_UPLOADS_DIR`, `STORAGE_*`, `IDENTITY_DB_PATH`, `AUDIT_LOG_PATH`, `ACCESS_STATE_*` |
 | OCR | `TESSERACT_CMD`, `PDF_RENDER_DPI` (clamped 120–300), `STRICT_QREADER_IMPORT` |
 
 Fixed limits: upload max 10 MB, extensions `png/jpg/jpeg/pdf`.
@@ -31,6 +32,7 @@ The app raises `RuntimeError` at startup in production if:
 - `HEALTH_DETAILS_TOKEN` is empty
 - `ACCESS_SHOW_CODE` or `IDENTITY_SHOW_OTP` is true, or OTP provider is `demo`
 - OTP provider is `email` with missing SMTP values or placeholder values
+- `STORAGE_BACKEND=s3` without credentials (or an AWS credential source)
 - `AUTH_PROVIDER=local` with a default or short (under 10 chars) `USER_PASSWORD`
 - `AUTH_PROVIDER=clerk` without both keys, or without an allow-list (unless `CLERK_ALLOW_ANY_USER=true`)
 

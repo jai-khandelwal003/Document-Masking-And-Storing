@@ -1,3 +1,4 @@
+from tests import _isolation  # noqa: F401  (must be first: isolates test data)
 import unittest
 from io import BytesIO
 from unittest.mock import patch

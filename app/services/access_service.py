@@ -1,3 +1,4 @@
+import io
 import os
 import time
 import hmac
@@ -14,6 +15,7 @@ from werkzeug.utils import secure_filename
 
 from app.utils.hash_utils import hmac_sha256, hash_file_sha256
 from app.services.otp_delivery_service import deliver_identity_otp, OtpDeliveryError
+from app.services.storage import StorageError, identity_docs_root, remote_storage
 
 
 _ACCESS_LOCK = threading.Lock()
@@ -34,7 +36,7 @@ _IDENTITY_ALLOWED_MIME = {
 
 
 def _identity_docs_root():
-    return os.path.abspath(os.path.join("output", "identity_docs"))
+    return identity_docs_root()
 
 
 def _safe_job_segment(job_id):
@@ -111,6 +113,18 @@ def _safe_file_remove(file_path):
         return
     if os.path.exists(candidate):
         os.remove(candidate)
+
+
+def _remove_item_files(item):
+    _safe_file_remove(item.get("filePath", ""))
+    key = str(item.get("storageKey", "") or "").strip()
+    remote = remote_storage()
+    if key and remote is not None:
+        try:
+            remote.delete(key)
+        except StorageError:
+            if has_app_context():
+                current_app.logger.warning("Could not delete stored document %s", key)
 
 
 def _state_persistence_enabled():
@@ -544,6 +558,7 @@ def upload_document_to_identity(job_id, document_type, document_id, label, file_
         }
 
         existing_docs = list(state.get("linkedDocuments", []))
+        remote_store = remote_storage()
         for item in existing_docs:
             item_hash = str(item.get("fileHash", "")).strip().lower()
             item_type = str(item.get("type", "")).strip().lower()
@@ -564,6 +579,16 @@ def upload_document_to_identity(job_id, document_type, document_id, label, file_
                         "fileHash": item_hash,
                     },
                 }, 200
+
+        if remote_store is not None:
+            storage_key = remote_store.key("identity_docs", _safe_job_segment(job_id), stored_name)
+            try:
+                remote_store.put_file(absolute_path, storage_key)
+            except StorageError:
+                _safe_file_remove(absolute_path)
+                return False, {"error": "Document storage is unavailable. Please try again."}, 502
+            _safe_file_remove(absolute_path)
+            document_entry["storageKey"] = storage_key
 
         state.setdefault("linkedDocuments", []).append(document_entry)
         state["linkedDocuments"] = _merge_documents(state.get("linkedDocuments", []), [])
@@ -615,7 +640,6 @@ def remove_document_from_identity(job_id, document_type, document_id="", label="
             item_id = str(item.get("id", "")).strip()
             item_label = str(item.get("label", "")).strip()
             item_file_key = str(item.get("fileKey", "")).strip()
-            item_file_path = str(item.get("filePath", "")).strip()
 
             type_match = item_type == doc_type
             id_match = (not doc_id) or item_id == doc_id
@@ -624,7 +648,7 @@ def remove_document_from_identity(job_id, document_type, document_id="", label="
 
             if type_match and id_match and label_match and file_match:
                 removed += 1
-                _safe_file_remove(item_file_path)
+                _remove_item_files(item)
                 continue
             filtered_docs.append(item)
 
@@ -808,6 +832,8 @@ def resolve_identity_documents(access_token):
         if not isinstance(item, dict):
             continue
         doc = dict(item)
+        doc.pop("filePath", None)
+        doc.pop("storageKey", None)
         file_key = str(doc.get("fileKey", "")).strip()
         if file_key:
             doc["fileUrl"] = f"/identity/document-file?token={quote(str(access_token or ''))}&file={quote(file_key)}"
@@ -843,6 +869,19 @@ def resolve_identity_document_file(access_token, file_key):
         item_file_key = str(item.get("fileKey", "")).strip()
         if item_file_key != target_file_key:
             continue
+
+        storage_key = str(item.get("storageKey", "") or "").strip()
+        if storage_key:
+            remote = remote_storage()
+            if remote is None:
+                raise ValueError("Document storage is not available")
+            try:
+                data = remote.get_bytes(storage_key)
+            except FileNotFoundError:
+                raise ValueError("Document file not found")
+            except StorageError:
+                raise ValueError("Document storage is unavailable")
+            return io.BytesIO(data), str(item.get("fileName", "")).strip() or os.path.basename(storage_key)
 
         file_path = os.path.abspath(str(item.get("filePath", "")))
         docs_root = _identity_docs_root()

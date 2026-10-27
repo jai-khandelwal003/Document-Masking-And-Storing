@@ -1,6 +1,7 @@
+import io
 import os
 
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, send_from_directory, session, url_for
 
 try:
     from flasgger import Swagger
@@ -12,6 +13,7 @@ from app.routes import access, auth, health, mask
 from app.models.identity_store import init_db as init_identity_db
 from app.models.audit_store import init_db as init_audit_db
 from app.services.access_service import resolve_secure_output_filename, resolve_identity_documents
+from app.services.storage import StorageError, init_storage, remote_storage
 from app.services.storage_cleanup import cleanup_storage
 
 
@@ -47,6 +49,11 @@ def _apply_runtime_guardrails(app):
         password = str(app.config.get("USER_PASSWORD", "") or "")
         if password in {"", "admin123", "change-me"} or len(password) < 10:
             raise RuntimeError("Production requires USER_PASSWORD to be set to a strong value (10+ chars, not the default)")
+
+    if str(app.config.get("STORAGE_BACKEND", "local")).strip().lower() == "s3":
+        has_static_keys = str(app.config.get("S3_ACCESS_KEY_ID", "") or "").strip() and str(app.config.get("S3_SECRET_ACCESS_KEY", "") or "").strip()
+        if not has_static_keys and not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE") and not os.environ.get("AWS_ROLE_ARN") and not os.environ.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"):
+            raise RuntimeError("Production with STORAGE_BACKEND=s3 requires S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY (or an AWS credential source)")
 
     api_key_required = _is_truthy(app.config.get("API_KEY_REQUIRED", True))
     if api_key_required and not str(app.config.get("API_KEY", "") or "").strip():
@@ -113,8 +120,11 @@ def create_app():
     _apply_runtime_guardrails(app)
     if Swagger is not None:
         Swagger(app)
-    init_identity_db()
-    init_audit_db()
+    init_storage(app)
+    # Inside an app context so the configured DB/log paths are used, not the defaults.
+    with app.app_context():
+        init_identity_db()
+        init_audit_db()
 
     if bool(app.config.get("STORAGE_CLEANUP_AT_STARTUP", True)) and not bool(app.config.get("TESTING", False)):
         cleanup_summary = cleanup_storage(app)
@@ -153,11 +163,24 @@ def create_app():
     def home():
         return redirect(url_for("auth.dashboard"))
 
+    def _send_output(filename):
+        remote = remote_storage()
+        if remote is None:
+            return send_from_directory(_resolve_output_dir(app), filename)
+        name = os.path.basename(filename)
+        try:
+            data = remote.get_bytes(remote.key("masked", name))
+        except FileNotFoundError:
+            return jsonify({"error": "File not found"}), 404
+        except StorageError:
+            return jsonify({"error": "Storage unavailable"}), 502
+        return send_file(io.BytesIO(data), mimetype="image/jpeg", download_name=name)
+
     @app.route("/output/<path:filename>")
     def output_file(filename):
         if filename not in session.get("owned_outputs", []):
             return jsonify({"error": "Not your file. Use /output/secure with an access token."}), 403
-        return send_from_directory(_resolve_output_dir(app), filename)
+        return _send_output(filename)
 
     @app.route("/output/secure", methods=["GET"])
     def secure_output_file():
@@ -170,7 +193,7 @@ def create_app():
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 401
 
-        return send_from_directory(_resolve_output_dir(app), filename)
+        return _send_output(filename)
 
     @app.route("/identity/view", methods=["GET"])
     def identity_documents_view():

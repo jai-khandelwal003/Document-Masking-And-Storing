@@ -21,6 +21,33 @@ Two login modes, selected by `AUTH_PROVIDER` (`local` or `clerk`; auto-selects `
 **Local**: `USER_ID` / `USER_PASSWORD`. A password changed in the UI is stored as a hash in `output/access_state.sqlite3`.
 Production refuses to start with the default or a short password.
 
+## Cloud storage (optional)
+
+By default documents live on local disk under `output/`. Set `STORAGE_BACKEND=s3` to keep them in any S3-compatible
+bucket instead (AWS S3, Cloudflare R2, Supabase Storage, MinIO):
+
+```
+STORAGE_BACKEND=s3
+S3_BUCKET=my-private-bucket
+S3_PREFIX=docmask
+S3_REGION=ap-south-1
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+# S3_ENDPOINT_URL=https://<account>.r2.cloudflarestorage.com   (R2 / MinIO / Supabase)
+# S3_SSE=            (empty if your provider rejects the encryption header)
+```
+
+- Use a **private** bucket with *Block all public access* on. The app never hands out bucket URLs: masked images, vault
+  documents and kept originals are streamed through the app, so the login, session-ownership and OTP checks still apply.
+- What moves: masked images (`masked/`), kept originals (`uploads/`, only if `PERSIST_ORIGINAL_UPLOADS=true`) and
+  identity-vault documents (`identity_docs/`). Files are written to `output/` only while being processed, then uploaded and deleted locally.
+- What stays local: the SQLite databases (access state, identity profiles, audit log). They hold hashes and metadata, not documents.
+- Objects are sent with server-side encryption (`S3_SSE=AES256` by default) and `STORAGE_CLEANUP_ENABLED` also deletes old
+  bucket objects at startup. For real retention, add a bucket lifecycle rule too.
+- Give the access key only `s3:PutObject`, `GetObject`, `DeleteObject`, `ListBucket` on that bucket. If the bucket is
+  unreachable, uploads fail with HTTP 502 and nothing is left half-saved.
+- Keeping Aadhaar-related documents with a third-party cloud provider has legal consequences. Check your obligations first.
+
 ## Known limitations
 
 - **Single worker by design.** Access codes, OTPs and the identity vault are kept in process memory (snapshotted to SQLite),
@@ -30,6 +57,7 @@ Production refuses to start with the default or a short password.
 - **Login required everywhere** except `/login` and `GET /health` (liveness only); `/health/details` needs login plus a token.
 - **Rate limiting** is per process and uses `X-Forwarded-For` only when `TRUST_PROXY_HEADERS=true` (set for the bundled nginx).
 - **OCR accuracy** is modest on noisy images; see `evaluation/RESULTS.md` for measured numbers (synthetic data only).
+- **Tests are isolated** from your real `output/` folder (they run against a temp directory), so running them is safe.
 - PDFs: only the first page is processed. Original uploads are deleted after processing unless `PERSIST_ORIGINAL_UPLOADS=true`.
 
 ## Panel Demo Guide

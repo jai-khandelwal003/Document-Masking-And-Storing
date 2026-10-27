@@ -11,6 +11,7 @@ from PIL import Image
 from app.config import Config
 from app.services.file_service import handle_file_upload
 from app.services.access_service import register_job_for_access, register_identity_vault, get_person_document_profile
+from app.services.storage import remote_storage
 from app.utils.hash_utils import hash_file_sha256, hmac_sha256
 
 
@@ -53,6 +54,15 @@ def _convert_pdf_first_page_to_jpg(input_pdf_path: str) -> str:
         errors.append(exc)
 
     raise RuntimeError("; ".join(str(err) for err in errors if str(err)) or "PDF conversion failed")
+
+
+def _store_output(output_path, output_filename):
+    """With a remote backend, move the finished masked image to the bucket and drop the local copy."""
+    remote = remote_storage()
+    if remote is None:
+        return
+    remote.put_file(output_path, remote.key("masked", output_filename), "image/jpeg")
+    os.remove(output_path)
 
 
 class MaskResponse:
@@ -299,6 +309,8 @@ def upload_document_and_mask(
             detail = str(exc).strip()
             if not detail:
                 detail = "unknown PDF parsing error"
+            if not _persist_original_uploads_enabled() and os.path.exists(input_path):
+                os.remove(input_path)
             return MaskResponse(
                 error="pdf-conversion-failed",
                 message=f"Unable to process PDF ({detail}). Ensure the file is valid, not password-protected, and try again.",
@@ -315,6 +327,8 @@ def upload_document_and_mask(
     processed_at = datetime.now(timezone.utc).isoformat()
 
     input_hash = hash_file_sha256(input_path)
+    is_masked = False
+    qr_detected = False
 
     try:
         aadhaar_detected = False
@@ -376,6 +390,7 @@ def upload_document_and_mask(
         if is_masked:
             aadhaar_hash = hmac_sha256(aadhaar_number, Config.HASH_SECRET) if aadhaar_number else ""
             output_hash = hash_file_sha256(output_path)
+            _store_output(output_path, output_filename)
             integrity_token = _build_integrity_token(job_id, processed_at, input_hash, output_hash)
             aadhaar_preview, access_challenge_value, access_challenge_type = _aadhaar_preview(
                 aadhaar_number,
@@ -556,6 +571,7 @@ def upload_document_and_mask(
 
         if qr_detected:
             output_hash = hash_file_sha256(output_path)
+            _store_output(output_path, output_filename)
             integrity_token = _build_integrity_token(job_id, processed_at, input_hash, output_hash)
             return MaskResponse(
                 error="",
@@ -615,8 +631,20 @@ def upload_document_and_mask(
         )
 
     finally:
-        if (not _persist_original_uploads_enabled()) and os.path.exists(input_path):
-            os.remove(input_path)
+        remote = remote_storage()
+        # Never leave an unmasked working copy behind: drop it when nothing was masked,
+        # or (remote storage) when it was not moved to the bucket.
+        if os.path.exists(output_path) and (remote is not None or not (is_masked or qr_detected)):
+            os.remove(output_path)
+        if os.path.exists(input_path):
+            if not _persist_original_uploads_enabled():
+                os.remove(input_path)
+            elif remote is not None:
+                try:
+                    remote.put_file(input_path, remote.key("uploads", os.path.basename(input_path)))
+                    os.remove(input_path)
+                except Exception:
+                    pass  # keep the local copy rather than lose the original
         if temp_converted_path and os.path.exists(temp_converted_path):
             os.remove(temp_converted_path)
 

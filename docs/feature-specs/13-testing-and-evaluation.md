@@ -13,9 +13,12 @@ Automated tests guard behavior and security rules; an evaluation script measures
 | `test_access_control.py` | access codes, OTP, tokens, identity unlock/view |
 | `test_identity_vault_fullmask.py` | vault behavior when everything is masked |
 | `test_auth_clerk.py` | Clerk login page and session exchange, JWT verification (signature/expiry/issuer/azp), allow-list, local password persistence, output ownership, proxy trust, production guardrails |
+| `test_storage.py` | S3 backend (fake client): upload/serve/delete, 502 on outage, no leftover local files, retention cleanup, health, config guardrails |
 | `test.py` | general/legacy checks |
 
 Tests call `_reset_access_state_for_tests()` to clear in-memory and persisted access state.
+
+`tests/_isolation.py` is imported first by every test module and points `IDENTITY_DOCS_DIR`, the SQLite/audit paths and upload folders at a temp directory, so running the tests never reads or deletes real documents in `output/`.
 
 ## Accuracy evaluation (`tools/evaluate_metrics.py`)
 - Input: a CSV like `evaluation/labels_template.csv` with columns `filename,document_type,expected_detected`.

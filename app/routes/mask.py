@@ -4,6 +4,7 @@ from app.services.mask_service import upload_aadhaar_and_mask, upload_document_a
 from app.utils.file_utils import allowed_file
 from app.utils.mime_utils import detect_mime_from_stream, is_allowed_upload_mime
 from app.models.audit_store import log_mask_job
+from app.services.storage import StorageError
 
 bp = Blueprint("mask", __name__)
 _RATE_LIMIT_STATE = {}
@@ -88,7 +89,10 @@ def mask_aadhaar_route():
     if not allowed_file(file.filename): return jsonify({"error": "Invalid file type"}), 400
     if not is_allowed_upload_mime(detect_mime_from_stream(file.stream)): return jsonify({"error": "Invalid file content"}), 400
     
-    resp = (upload_aadhaar_and_mask if dt == "aadhaar" else upload_document_and_mask)(file, f8, l4, mq, document_type=dt)
+    try:
+        resp = (upload_aadhaar_and_mask if dt == "aadhaar" else upload_document_and_mask)(file, f8, l4, mq, document_type=dt)
+    except StorageError:
+        return jsonify({"error": "Document storage is unavailable. Please try again."}), 502
     result = resp.to_dict()
     _remember_output(result)
     mode = "both" if f8 and l4 else ("first8" if f8 else "last4")

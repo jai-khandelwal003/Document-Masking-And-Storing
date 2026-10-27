@@ -1,3 +1,4 @@
+from tests import _isolation  # noqa: F401  (must be first: isolates test data)
 import os
 import shutil
 import unittest
@@ -93,7 +94,7 @@ class AccessControlTestCase(unittest.TestCase):
             os.remove(self.output_file_fragment)
         if os.path.exists(self.output_file_fullmask):
             os.remove(self.output_file_fullmask)
-        shutil.rmtree(os.path.join("output", "identity_docs"), ignore_errors=True)
+        shutil.rmtree(self.app.config["IDENTITY_DOCS_DIR"], ignore_errors=True)
 
     def test_request_and_verify_access_code_flow(self):
         issue = self.client.post(

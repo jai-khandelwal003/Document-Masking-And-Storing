@@ -1,6 +1,8 @@
 import os
 import time
 
+from app.services.storage import StorageError, identity_docs_root
+
 
 def _iter_old_files(root_dir, cutoff_epoch):
     if not root_dir or not os.path.isdir(root_dir):
@@ -51,7 +53,7 @@ def cleanup_storage(app):
 
     output_root = os.path.abspath(os.path.join(app.root_path, "..", "output"))
     uploads_root = os.path.abspath(str(app.config.get("ORIGINAL_UPLOADS_DIR", os.path.join("output", "uploads"))))
-    identity_root = os.path.abspath(os.path.join(output_root, "identity_docs"))
+    identity_root = identity_docs_root()
 
     deleted_files = 0
     deleted_dirs = 0
@@ -80,6 +82,14 @@ def cleanup_storage(app):
                 continue
             if mtime <= cutoff_epoch and _remove_file(full_path):
                 deleted_files += 1
+
+    remote = app.extensions.get("remote_storage")
+    if remote is not None:
+        for category in ("masked", "identity_docs", "uploads"):
+            try:
+                deleted_files += remote.delete_older_than(remote.key(category) + "/", cutoff_epoch)
+            except StorageError as exc:
+                app.logger.warning("Remote storage cleanup failed for %s: %s", category, exc)
 
     deleted_dirs += _prune_empty_dirs(identity_root)
     if os.path.abspath(uploads_root) != os.path.abspath(identity_root):

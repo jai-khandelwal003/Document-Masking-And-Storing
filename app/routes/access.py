@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, send_file
 from werkzeug.utils import secure_filename
+import io
 import os
 import re
 import secrets
@@ -18,6 +19,7 @@ from app.services.access_service import (
 )
 from app.models.identity_store import add_document, get_documents, remove_document, upsert_profile
 from app.models.audit_store import get_recent_entries
+from app.services.storage import StorageError, identity_docs_root, remote_storage
 from app.utils.mime_utils import detect_mime_from_stream, is_allowed_upload_mime
 
 
@@ -140,10 +142,20 @@ def upload_identity_document_route():
 
     safe_name = secure_filename(file_obj.filename)
     file_key = secrets.token_hex(12)
-    storage_dir = os.path.abspath(os.path.join("output", "identity_docs", profile_key))
+    storage_dir = os.path.join(identity_docs_root(), profile_key)
     os.makedirs(storage_dir, exist_ok=True)
     save_path = os.path.join(storage_dir, f"{file_key}_{safe_name or ('document' + extension)}")
     file_obj.save(save_path)
+
+    remote = remote_storage()
+    if remote is not None:
+        stored_name = os.path.basename(save_path)
+        try:
+            remote.put_file(save_path, remote.key("identity_docs", profile_key, stored_name))
+        except StorageError:
+            os.remove(save_path)
+            return jsonify({"error": "Document storage is unavailable. Please try again."}), 502
+        os.remove(save_path)
 
     doc = add_document(
         profile_key,
@@ -231,7 +243,21 @@ def identity_document_file_route():
         # Directly resolve file from output/identity_docs/<profile_key> by matching file_key prefix
         if not _valid_profile_key(profile_key) or not _PROFILE_KEY_RE.fullmatch(file_key or ""):
             return jsonify({"error": "Invalid profileKey or file"}), 400
-        storage_dir = os.path.abspath(os.path.join("output", "identity_docs", profile_key))
+        remote = remote_storage()
+        if remote is not None:
+            try:
+                stored_key = remote.find_first_by_prefix(remote.key("identity_docs", profile_key, f"{file_key}_"))
+                if not stored_key:
+                    return jsonify({"error": "File not found"}), 404
+                data = remote.get_bytes(stored_key)
+            except FileNotFoundError:
+                return jsonify({"error": "File not found"}), 404
+            except StorageError:
+                return jsonify({"error": "Storage unavailable"}), 502
+            stored_name = stored_key.rsplit("/", 1)[-1]
+            download_name = stored_name.split("_", 1)[1] if "_" in stored_name else stored_name
+            return send_file(io.BytesIO(data), as_attachment=True, download_name=download_name)
+        storage_dir = os.path.join(identity_docs_root(), profile_key)
         if not os.path.isdir(storage_dir):
             return jsonify({"error": "Profile directory not found"}), 404
         for name in os.listdir(storage_dir):
