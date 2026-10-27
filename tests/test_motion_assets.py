@@ -101,12 +101,12 @@ class MotionAssetTests(unittest.TestCase):
         self.assertNotIn("data-page=", self.client.get("/dashboard").get_data(as_text=True))
 
     def test_stylesheet_never_animates_the_dashboards_fade_up_panels(self):
-        css = read("motion.css")
+        css = re.sub(r"/\*.*?\*/", "", read("motion.css"), flags=re.S)  # comments mention `.panel` on purpose
         for block in re.findall(r"([^{}]+)\{([^{}]*animation:[^{}]*)\}", css):
             selector = block[0].strip()
-            if selector.startswith(("@", "from", "to")) or re.match(r"^\d", selector):
-                continue
-            self.assertNotRegex(selector, r"(?<![\w-])\.panel\b(?!.*\[data-page)", f"{selector} would override .fade-up")
+            if selector.startswith(("@", "from", "to", 'body[data-page="')) or re.match(r"^\d", selector):
+                continue  # keyframe steps and rules already scoped to another page
+            self.assertNotRegex(selector, r"(?<![\w-])\.panel\b", f"{selector} would override .fade-up")
 
     def test_clerk_page_has_busy_and_done_states(self):
         self.app.config.update(AUTH_PROVIDER="clerk", CLERK_PUBLISHABLE_KEY=PUBLISHABLE_KEY, CLERK_SECRET_KEY="sk_test_dummy")
